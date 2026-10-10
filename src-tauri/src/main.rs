@@ -34,7 +34,11 @@ fn reveal_finding(id: String, state: State<'_, AppState>) -> Result<(), String> 
     #[cfg(windows)]
     let result = {
         let system = std::env::var_os("SystemRoot").ok_or("SystemRoot is unavailable")?;
-        std::process::Command::new(Path::new(&system).join("explorer.exe")).arg(directory).spawn()
+        // The scanner uses canonical extended-length paths. Explorer expects the
+        // ordinary drive path; its long-path support is separate from file I/O.
+        let text = directory.to_string_lossy();
+        let shell_path = text.strip_prefix(r"\\?\").unwrap_or(&text);
+        std::process::Command::new(Path::new(&system).join("explorer.exe")).arg(shell_path).spawn()
     };
     #[cfg(target_os = "macos")]
     let result = std::process::Command::new("/usr/bin/open").arg(directory).spawn();

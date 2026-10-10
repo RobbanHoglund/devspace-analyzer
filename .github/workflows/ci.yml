@@ -76,6 +76,16 @@ jobs:
         run: cargo test -p devspace-core
       - name: Build Windows desktop and installer
         run: npm run tauri -- build --bundles nsis
+      - name: Exercise the actual desktop through WebView2
+        run: node scripts/native-smoke.mjs
+      - name: Retain native test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-checks
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7
       - name: Retain Windows executables
         uses: actions/upload-artifact@v4
         with:
