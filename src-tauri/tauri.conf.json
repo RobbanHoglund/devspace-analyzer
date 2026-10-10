@@ -1,14 +1,9 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DevSpace Analyzer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "identifier": "se.devspace.analyzer",
-  "build": {
-    "beforeDevCommand": "npm run dev",
-    "devUrl": "http://127.0.0.1:1420",
-    "beforeBuildCommand": "npm run build",
-    "frontendDist": "../dist"
-  },
+  "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": {
     "windows": [{ "label": "main", "title": "DevSpace Analyzer", "width": 1440, "height": 940, "minWidth": 1000, "minHeight": 700 }],
     "security": {
@@ -17,9 +12,7 @@
     }
   },
   "bundle": {
-    "active": true,
-    "targets": ["nsis"],
-    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "active": true, "targets": ["nsis"], "icon": ["icons/icon.png", "icons/icon.ico"],
     "shortDescription": "Read-only disk intelligence for developers",
     "windows": { "nsis": { "installMode": "currentUser" } }
   }

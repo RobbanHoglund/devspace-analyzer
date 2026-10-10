@@ -15,6 +15,7 @@ impl Environment {
         })
     }
     fn override_value(&self, name: &str) -> Option<Result<String, &'static str>> {
+        if name.is_empty() { return None; }
         if !name.to_ascii_lowercase().starts_with("npm_config_") { return self.var(name).map(Ok); }
         // npm names are case-insensitive even on Unix. Do not make unrelated
         // Unix environment names case-insensitive or guess conflicting values.
@@ -52,6 +53,7 @@ fn expand(value: &str, env: &Environment) -> Option<PathBuf> {
     }
     None
 }
+/// An empty variable name means config/default-only resolution (Maven).
 fn resolved(env: &Environment, variable: &str, configured: Option<Result<String, &'static str>>, fallback: PathBuf, config_source: &str, warnings: &mut Vec<ScanWarning>) -> Option<(PathBuf, String)> {
     let explicit = if let Some(value) = env.override_value(variable) {
         Some((value, format!("Environment: {variable}")))
@@ -93,19 +95,24 @@ pub fn discover_with_warnings(env: &Environment) -> Discovery {
     } else { (None, None) };
     let gradle = resolved(env, "GRADLE_USER_HOME", None, env.home.join(".gradle"), "", warnings);
     let npm = resolved(env, "npm_config_cache", cache_setting, if win { local.join("npm-cache") } else { env.home.join(".npm") }, "User npm configuration: cache", warnings);
-    let maven_text = read_config(&env.home.join(".m2/settings.xml"), "User Maven settings.xml", false, warnings);
-    let maven_config = maven_text.as_ref().and_then(|text| match roxmltree::Document::parse(text) {
-        Ok(doc) => doc.root_element().children().find(|n| n.has_tag_name("localRepository")).and_then(|n| n.text()).map(|s| Ok(s.to_owned())),
-        Err(_) => Some(Err("Invalid Maven settings XML; no repository fallback inferred.")),
-    });
-    let maven = resolved(env, "DEVSPACE_UNUSED_MAVEN_OVERRIDE", maven_config, env.home.join(".m2/repository"), "User Maven settings.xml: localRepository", warnings);
+    let maven_path = env.home.join(".m2/settings.xml");
+    let maven_text = read_config(&maven_path, "User Maven settings.xml", false, warnings);
+    let maven_config = if let Some(text) = &maven_text {
+        match roxmltree::Document::parse(text) {
+            Ok(doc) => doc.root_element().children().find(|n| n.has_tag_name("localRepository")).and_then(|n| n.text()).map(|s| Ok(s.to_owned())),
+            Err(_) => Some(Err("Invalid Maven settings XML; no repository fallback inferred.")),
+        }
+    } else if fs::symlink_metadata(&maven_path).is_ok() {
+        Some(Err("Maven settings are unresolved; no repository fallback inferred."))
+    } else { None };
+    let maven = resolved(env, "", maven_config, env.home.join(".m2/repository"), "User Maven settings.xml: localRepository", warnings);
     let pip = resolved(env, "PIP_CACHE_DIR", None, pip_base.join(if win { "pip/Cache" } else { "pip" }), "", warnings);
     // uv intentionally differs from pip on macOS.
-    let uv_default = if win { local.join("uv/cache") } else { xdg.join("uv") };
+    let uv_default = if win { local.join("uv/cache") } else { xdg.clone().join("uv") };
     let uv = resolved(env, "UV_CACHE_DIR", None, uv_default, "", warnings);
     let pnpm_default = if win { local.join("pnpm/store") } else if mac { env.home.join("Library/pnpm/store") } else { env.var("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|| env.home.join(".local/share")).join("pnpm/store") };
     let pnpm = resolved(env, "npm_config_store_dir", store_setting, pnpm_default, "User npm configuration: store-dir", warnings);
-    let yarn = resolved(env, "YARN_CACHE_FOLDER", None, if win { local.join("Yarn/Cache") } else if mac { env.home.join("Library/Caches/yarn") } else { xdg_yarn(env) }, "", warnings);
+    let yarn = resolved(env, "YARN_CACHE_FOLDER", None, if win { local.join("Yarn/Cache") } else if mac { env.home.join("Library/Caches/yarn") } else { xdg.join("yarn") }, "", warnings);
     let mut candidates = vec![];
     if let Some((home, source)) = gradle {
         candidates.extend([(Some((home.join("caches"), source.clone())), "Gradle", "gradle-caches"), (Some((home.join("wrapper/dists"), source.clone())), "Gradle", "gradle-wrappers"), (Some((home.join("jdks"), source)), "Gradle", "toolchains")]);
@@ -120,12 +127,9 @@ pub fn discover_with_warnings(env: &Environment) -> Discovery {
             Err(_) => {}
         }
     }
-    // Resolve overlapping identities conservatively: a protected cache must win
-    // over a review-only cache configured at the exact same path.
     out.locations.sort_by_key(|c| !matches!(c.kind.as_str(), "maven-repository" | "toolchains" | "virtual-disks"));
     out
 }
-fn xdg_yarn(env: &Environment) -> PathBuf { env.var("XDG_CACHE_HOME").map(PathBuf::from).unwrap_or_else(|| env.home.join(".cache")).join("yarn") }
 
 #[cfg(test)]
 mod tests {

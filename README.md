@@ -2,117 +2,89 @@
 
 **Understand your development storage before removing anything.**
 
-DevSpace Analyzer is a Windows-first desktop pilot that inventories checked-out projects and shared developer caches. It explains what was found, how it was classified and what recovery would involve. All scanning happens locally.
+Windows-first desktop pilot for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Pilot 0.1.0 is read-only. It has no delete, cleanup, package installation or build-execution commands. A review candidate is not a promise that deletion is safe or that its logical size will become free disk space.
+> Pilot 0.1.1 is read-only. There are no cleanup, dependency-installation or project build-execution commands. Candidate sizes are logical bytes, not guaranteed physical space savings.
 
-## What the pilot does
+## Pilot 0.1.1
 
-- A visual overview of developer storage, with a clickable ecosystem map.
-- Project discovery from Git markers and Java, Node and Python manifests, including nested projects and worktree markers.
-- Gradle cache and wrapper inventory; wrapper versions are cross-referenced against discovered project wrappers.
-- Maven repository/output, npm/npx storage, Node dependencies, pnpm/Yarn locations, Python environments and pip/uv caches.
-- Searchable findings with evidence, risk classification, recovery notes and personal protection preferences.
-- A scan-coverage view with effective roots, cache-location provenance, skipped entries and explicit limitations.
-- Cancellable background scanning, logical byte counts and JSON/Markdown export. A redacted summary is the default export.
+Fixes six reviewed issues: protected descendants inside aggregates; explicit-cache recognition with automatic inclusion off; npm configuration parsing; the macOS uv cache default; linked wrapper-marker ancestors; and pagination after protection changes. See [review fixes and trade-offs](docs/REVIEW_001_FIXES.md).
 
-## Try the desktop application
+## Features
 
-A successful **Windows x64 desktop** job in GitHub Actions produces the `devspace-windows-x64` artifact. It contains the per-user NSIS installer and the application executable. Pilot builds are unsigned; check the repository and build revision before running an executable. Build artifacts expire after 14 days.
+- Clickable ecosystem storage map, searchable findings, project inventory and scan coverage.
+- Gradle caches/wrappers, Maven repositories/output, npm/npx storage, Node dependencies, known pnpm/Yarn locations, Python environments and pip/uv caches.
+- Project discovery from Java/Node/Python manifests and Git markers; scoped Gradle wrapper references.
+- Evidence, recovery notes, conservative protection and saved personal protection preferences.
+- Cancellable native scanning, folder reveal and JSON/Markdown export; redacted summary by default.
+- Explicitly marked synthetic demo data for the browser preview.
 
-### Build and run from source on Windows
+## Windows
 
-Install Node.js 22.12 or newer, stable Rust with the MSVC toolchain, Microsoft C++ Build Tools and WebView2. See the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/) for the supported Windows setup.
+A successful **Windows x64 desktop** job publishes `devspace-windows-x64`, containing the unsigned NSIS installer and executable. Artifacts expire after 14 days. Check the source revision and test result before running a pilot binary.
+
+To build from source, install Node.js 22.12+, stable Rust/MSVC, Microsoft C++ Build Tools and WebView2 as described in the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
-git clone --branch feature/pilot git@github.com:RobbanHoglund/devspace-analyzer.git
+git clone --branch fix/pilot-review-001 git@github.com:RobbanHoglund/devspace-analyzer.git
 cd devspace-analyzer
 npm install
 npm run tauri -- dev
 ```
 
-For a distributable Windows installer:
+Build the installer with `npm run tauri -- build --bundles nsis`. Icons are generated locally; no icon or font downloads are needed.
 
-```powershell
-npm run tauri -- build --bundles nsis
-```
+For the first scan, choose a repository parent folder such as `C:\ws\git`. Add shared caches through the optional checkbox, then inspect Findings and Scan coverage. Administrator privileges are not required; inaccessible areas are reported, not bypassed.
 
-The icon is generated locally by the launch/build command. No icon or font downloads are required.
+## Browser preview
 
-### First scan
+Run `npm install` and `npm run dev`, open `http://127.0.0.1:1420`, then select **Explore demo**. The preview does not scan the filesystem and never claims that synthetic figures came from this computer.
 
-1. Add a parent folder containing your repositories, for example `C:\Workspaces` or `C:\ws\git`.
-2. Leave **Include known shared caches** enabled to include discovered user-level cache locations.
-3. Select **Scan workspace**, then inspect the largest findings. Start with a narrow workspace rather than the entire system drive.
-4. Review **Scan coverage** before interpreting totals. Export a redacted report to discuss the findings without exposing your local paths.
-
-Administrative privileges are not required. Inaccessible locations are reported rather than bypassed.
-
-### Browser-only preview
-
-```sh
-npm install
-npm run dev
-```
-
-Open `http://127.0.0.1:1420` and select **Explore demo**. The preview uses explicitly marked synthetic data. **A normal browser cannot run the native filesystem scanner.** No scan starts automatically, and demo protection preferences do not change desktop scan preferences.
-
-## What the numbers mean
+## Interpreting results
 
 | Metric | Meaning |
 |---|---|
-| Identified developer data | Sum of classified, non-nested finding paths, using logical file lengths |
-| Review candidates | Measured complete findings not protected by a rule or your preferences; not guaranteed savings |
-| Protected data | Storage that can contain unique data, or a path you personally protected |
-| Project owned size | Logical file lengths owned by that project, excluding nested projects to avoid double counting |
-| Files measured | Files in the effective scan scope, including files not classified as developer artifacts |
+| Identified developer data | Logical file lengths in classified aggregate findings |
+| Review candidates | Complete findings not protected by a rule or personal preference; not deletion approval |
+| Protected data | Potentially unique data or personal protection, including an aggregate containing protected descendants |
+| Owned project size | File lengths charged exclusively to that project, excluding nested source projects |
+| Measured files | Files in the effective traversal roots, including unclassified data |
 
-Hardlinks, sparse virtual disks, compression and shared package stores can make logical sizes very different from physically reclaimable space. The pilot does not claim a physical-space estimate. Skipped links and unreadable entries make coverage partial.
+Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this pilot.
 
-## Safety boundaries
+## Safety and scope
 
-- No analyzed project code, build script, package-manager command or Git command is executed.
-- Symbolic links, Windows junctions and other reparse points are skipped, including explicitly selected linked roots.
-- `.git`, Maven repositories, Java toolchain downloads, Yarn project storage and virtual disks are protected rather than treated as disposable caches.
-- A lockfile's presence is evidence, not proof of reproducibility. Local packages, unpublished versions, patches and offline requirements still matter.
-- No matching Gradle wrapper means only "not found in this scan", never "unused everywhere".
-- File modification timestamps are not interpreted as last-use dates.
-- The scanner does not read source contents or arbitrary file contents. Small, allowlisted configuration/manifest fields are read for location and project detection.
-- Opening a folder uses the system file manager only after a user action. Report export writes a newly selected report file and refuses to overwrite an existing file.
+The scanner executes no project code, build script, package-manager command or Git command. It rejects symlinks/junctions/reparse points, including linked marker ancestors. Git metadata, Maven storage, Java toolchains, Yarn project storage and virtual disks are protected. The presence of a lockfile or absence of wrapper matches does not prove that anything can be recovered or is unused.
 
-See [Safety and privacy](docs/SAFETY.md) for important limitations.
+Only selected roots plus optionally included caches are traversed. Configuration discovery reads bounded user settings for identity even with automatic inclusion off; unrelated cache contents are not scanned. The coverage view lists effective roots separately from recognized overlapping cache identities. Invalid explicit configuration produces redacted diagnostics, not silent fallback guesses.
 
-## Current scope and omissions
+Only known bounded manifest/configuration fields are read. No arbitrary source contents, `.env` values or executable contents are exported. Opening a folder and exporting a new report are explicit actions; exports refuse to overwrite existing files. Full reports contain potentially sensitive metadata; the default redacted summary withholds free-text paths, names, branches and evidence. Scan reports remain in memory unless exported. Preferences stay local.
 
-This pilot is an inventory and explanation tool, not a dependency garbage collector. It does **not** resolve complete dependency graphs, inspect all Git branches, determine the dirty/tracked state, prove that a remote package still exists, detect all running tools or clean any files. Containers and VHDX files are protected observations, not a complete Docker/Podman/WSL inventory.
+The pilot does not resolve complete dependency graphs, all Git branches, dirty/tracked state, remote availability, every running tool, physical allocation or complete container inventories. Project/CLI overrides, pip.ini and arbitrary Yarn/Gradle configuration are not evaluated. The scan is bounded to 5 million entries, 20,000 findings, 10,000 projects and 128 levels; at most 500 warning details are retained.
 
-Environment overrides and selected user npm/Maven settings are supported. Project-specific overrides, custom Gradle init scripts, pip.ini, arbitrary Yarn configurations and command-line overrides are not evaluated. Discovered cache locations list their source. Missing or inaccessible default cache paths are omitted from discovery; the list is not a guarantee that all caches were located.
+See [Safety and privacy](docs/SAFETY.md), [native verification](docs/NATIVE_TESTING.md) and [next steps](docs/NEXT_STEPS.md). Snapshot path guards are not race-free protection against hostile concurrent filesystem changes. No formal security audit is claimed.
 
-The scan is bounded to 5 million entries, 20,000 findings, 10,000 projects and 128 directory levels. At most 500 warning details are retained. Closing the application does not persist a full scan report: only selected roots and personal protection preferences are saved locally.
-
-## Development and verification
+## Development
 
 ```sh
+cargo test -p devspace-core
 npm test
 npm run build
-cargo test -p devspace-core
 npx playwright install chromium
 npm run test:ui
 ```
 
-CI is configured to run core tests on Linux and Windows, frontend unit tests, browser interaction tests and a Windows desktop/installer build. Browser tests generate screenshots under `artifacts/`. Consult the checks for the exact revision being used; a configured check is not itself evidence of a passing run.
+Normal CI runs original and review regression tests on Linux/Windows, frontend tests/build, browser interaction tests, Windows packaging and a real native scan. `scripts/windows-native-test.ps1` exercises the release executable at normal user integrity. Large-workspace benchmarks/cancellation, native file-dialog interaction and installer installation/uninstallation remain separate validation tasks.
 
-The dependency ranges in this pilot are resolved by `npm install` and Cargo. CI retains the generated lockfiles alongside test artifacts; locked dependency snapshots should be committed before promoting a release beyond the pilot stage.
-
-## Structure
+Dependency ranges are currently resolved by npm and Cargo. CI retains generated lockfiles; commit validated lock snapshots before promoting beyond the pilot stage.
 
 ```text
-crates/core/          Read-only scanner, location discovery, rules and filesystem tests
-src/                 React interface, report transformations and demo data
-src-tauri/           Native commands, cancellation, folder reveal and report export
-scripts/             Deterministic local icon generation
-tests/ui/            Browser interaction and layout tests
-docs/                Safety model, review checklist and next-stage scope
+crates/core/    Read-only scanner, cache discovery, rules and regression fixtures
+src/           React UI, report transforms, pagination and synthetic demo
+src-tauri/     Native commands, cancellation, folder reveal and report export
+scripts/       Local icon generation and native test support
+tests/ui/      Browser baseline and regression tests
+docs/          Safety, review fixes and validation limits
 ```
 
-The native core and UI communicate through a typed, versioned report model. No network service, database or account is needed for scanning. The development toolchain and an installer that needs WebView2 can require network access; the scanner itself does not make network requests.
+No server, account or database is needed for scanning. The development toolchain and WebView2 installation may require network access; the scanner itself makes no network requests.

@@ -23,6 +23,9 @@ put('service/build/classes/output.bin', Buffer.alloc(2048, 1));
 put('web/package.json', '{"name":"native-fixture-web"}');
 put('web/package-lock.json', '{"lockfileVersion":3}');
 put('web/node_modules/example/index.js', Buffer.alloc(1024, 2));
+put('web/build/persistent.vhdx', Buffer.alloc(4096, 4));
+put('web/build/private-tools/.git/HEAD', 'ref: refs/heads/main\n');
+put('web/build/private-tools/source.js', '// Unique source, not ordinary generated output\n');
 put('python/pyproject.toml', '[project]\nname = "native-fixture-python"\n');
 put('python/.venv/pyvenv.cfg', 'home = fixture-interpreter\n');
 put('python/module.py', '# Source filename for bytecode recovery evidence\n');
@@ -40,8 +43,7 @@ function snapshot(root) {
 }
 const before = snapshot(workspace);
 const endpoint = 'http://127.0.0.1:9337';
-// The application does not enable a debugging endpoint. This environment setting
-// is limited to the automated test's child process and disposable profile.
+// CI child process only. The distributed application enables no debug endpoint.
 const child = spawn(executable, [], {
   env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
   stdio: ['ignore', 'pipe', 'pipe']
@@ -78,19 +80,37 @@ try {
   await expect(page.getByRole('button', { name: 'Completed within scope', exact: true })).toBeVisible();
   await page.screenshot({ path: join(artifacts, 'native-overview.png'), fullPage: true });
   await page.getByRole('button', { name: 'Projects', exact: true }).click();
-  await expect(page.locator('tbody tr')).toHaveCount(3);
+  await expect(page.locator('tbody tr')).toHaveCount(4);
+  await expect(page.locator('tbody tr').filter({ hasText: 'private-tools' })).toHaveCount(1);
   await page.getByRole('button', { name: 'Findings', exact: false }).first().click();
-  await expect(page.locator('tbody tr')).toHaveCount(5);
+  await expect(page.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
   await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeEnabled();
   await expect(page.getByRole('complementary', { name: 'Finding details' })).toContainText('1 KiB');
   await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Possible Node build artifacts/ }).click();
+  const detail = page.getByRole('complementary', { name: 'Finding details' });
+  await expect(detail.locator('.badge')).toHaveText(/Protected/);
+  await expect(detail).toContainText('entire aggregate is excluded from review candidates');
+  await expect(detail).toContainText('Virtual disk image');
+  await expect(detail).toContainText('Explicit nested Git project');
+  await expect(detail.getByRole('button', { name: 'Protect this path', exact: true })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(artifacts, 'native-findings.png'), fullPage: true });
   expect(snapshot(workspace)).toEqual(before);
   expect(errors).toEqual([]);
-  const result = { passed: true, revision: process.env.GITHUB_SHA ?? 'local', executableSha256: createHash('sha256').update(readFileSync(executable)).digest('hex'), platform: process.platform, browser: browser.version(), checks: ['Native desktop startup', 'No browser/demo fallback', 'Real Rust scan through the desktop UI', 'Three discovered projects and five findings', 'Expected Node dependency size', 'Personal protection interaction', 'Fixture content and modification times unchanged', 'No observed page errors'], notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation'] };
+  const result = {
+    passed: true, revision: process.env.GITHUB_SHA ?? 'local',
+    executableSha256: createHash('sha256').update(readFileSync(executable)).digest('hex'),
+    platform: process.platform, browser: browser.version(),
+    checks: ['Native desktop startup', 'No browser/demo fallback', 'Real Rust scan through desktop UI',
+      'Four projects including nested source repository; six findings', 'Expected Node dependency size',
+      'Personal protection interaction', 'VHDX and nested Git protect enclosing build aggregate',
+      'Intrinsic protection cannot be removed by personal-protection toggle',
+      'Fixture content and modification times unchanged', 'No observed page errors'],
+    notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation']
+  };
   writeFileSync(join(artifacts, 'native-smoke.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
@@ -103,6 +123,6 @@ try {
   if (browser) await browser.close().catch(() => {});
   if (child.pid) spawnSync('taskkill', ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
   writeFileSync(join(artifacts, 'native-process.log'), processOutput);
-  // Cleanup is restricted to the uniquely generated fixture/profile directory.
+  // Test fixtures only, never a user-selected workspace.
   rmSync(temp, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 });
 }
