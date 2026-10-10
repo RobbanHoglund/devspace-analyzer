@@ -91,8 +91,8 @@ jobs:
       - name: Prepare the supported WebView2 runtime
         run: ./scripts/windows-test-runtime.ps1
       - name: Exercise the actual desktop through WebView2
-        timeout-minutes: 4
-        run: node scripts/native-smoke.mjs
+        timeout-minutes: 5
+        run: ./scripts/windows-native-test.ps1
       - name: Retain native test evidence
         if: always()
         uses: actions/upload-artifact@v4

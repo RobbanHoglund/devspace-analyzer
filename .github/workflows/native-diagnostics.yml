@@ -5,9 +5,13 @@ on:
     branches: [feature/pilot]
     paths:
       - '.github/workflows/native-diagnostics.yml'
-      - 'scripts/windows-test-runtime.ps1'
-      - 'scripts/windows-diagnostics.ps1'
+      - 'scripts/windows-native-test.ps1'
   workflow_dispatch:
+    inputs:
+      run_id:
+        description: 'Run containing a non-expired devspace-windows-x64 artifact'
+        required: true
+        default: '38042577232'
 
 permissions:
   contents: read
@@ -17,7 +21,7 @@ jobs:
   startup:
     name: Verify previously built Windows pilot
     runs-on: windows-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -27,18 +31,17 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           name: devspace-windows-x64
-          run-id: 38041442164
+          run-id: ${{ inputs.run_id || '38042577232' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: prebuilt
       - name: Prepare the supported WebView2 runtime
         run: ./scripts/windows-test-runtime.ps1
-      - name: Inspect startup and perform native scan
+      - name: Inspect startup and perform native scan as a normal user
         shell: pwsh
         run: |
           $exe = Get-ChildItem prebuilt -Recurse -Filter devspace-analyzer.exe | Select-Object -First 1
           if (-not $exe) { throw 'Prebuilt executable was not downloaded.' }
-          $env:DEVSPACE_STARTUP_DIAGNOSTICS = '1'
-          node scripts/native-smoke.mjs $exe.FullName
+          ./scripts/windows-native-test.ps1 -Executable $exe.FullName
       - name: Retain startup evidence
         if: always()
         uses: actions/upload-artifact@v4
