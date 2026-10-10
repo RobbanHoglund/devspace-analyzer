@@ -4,7 +4,7 @@
 
 The scanner uses directory enumeration, metadata and a bounded set of configuration reads. It does not remove, rename, overwrite, compress or move scanned files. There is no shell plugin, arbitrary filesystem plugin, HTTP plugin, cleanup endpoint or hidden deletion action.
 
-The desktop shell stores its own local preferences. **Open folder** starts the operating system file manager for a finding in the latest native scan. **Export** opens a native save dialog and creates a new `.json` or `.md` file; existing files are never overwritten. An interrupted export may leave an incomplete newly created report. These explicit actions are separate from scanning.
+The desktop shell stores its own local preferences. Scanner validation of personal protection accepts existing local directories. Files, missing paths, links and other rejected inputs produce `invalid-protection` coverage warnings without dropping valid protection entries or blocking the scan. The UI retains saved preferences conservatively; these warnings do not remove preferences or override intrinsic protection. **Open folder** starts the operating system file manager for a finding in the latest native scan. **Export** opens a native save dialog and creates a new `.json` or `.md` file; existing files are never overwritten. An interrupted export may leave an incomplete newly created report. These explicit actions are separate from scanning.
 
 Operating-system access timestamps and external software can still change while files are read. The read-only claim does not mean the complete operating system remains bit-for-bit unchanged.
 
@@ -52,4 +52,4 @@ Scan reports remain in memory until explicitly exported. The application does no
 
 The application loads bundled local content. Its content-security policy rejects external scripts, frames and objects. The only enabled plugin capability is the directory picker plus Tauri's core window/event facilities. Custom native commands expose scan, cancellation, finding-based folder reveal and user-dialog-mediated report export.
 
-The pilot has not undergone a formal security audit. Dependency lockfiles, signed release binaries, large-scale performance measurements, stronger hostile-filesystem hardening and additional native UI tests are release-hardening work, not claims of this version.
+The pilot has not undergone a formal security audit. Signed release binaries, large-scale performance measurements, stronger hostile-filesystem hardening and additional native UI tests are release-hardening work, not claims of this version.

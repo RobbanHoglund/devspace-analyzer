@@ -82,6 +82,10 @@ try {
   await page.getByRole('button', { name: 'Projects', exact: true }).click();
   await expect(page.locator('tbody tr')).toHaveCount(4);
   await expect(page.locator('tbody tr').filter({ hasText: 'private-tools' })).toHaveCount(1);
+  await page.locator('tbody tr').filter({ hasText: 'private-tools' }).getByRole('button', { name: 'Inspect' }).click();
+  await expect(page.locator('tbody tr')).toHaveCount(1);
+  await expect(page.locator('.project-context')).toContainText('inside protected storage');
+  await expect(page.locator('tbody tr')).toContainText('Protected');
   await page.getByRole('button', { name: 'Findings', exact: false }).first().click();
   await expect(page.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
@@ -106,6 +110,7 @@ try {
     platform: process.platform, browser: browser.version(),
     checks: ['Native desktop startup', 'No browser/demo fallback', 'Real Rust scan through desktop UI',
       'Four projects including nested source repository; six findings', 'Expected Node dependency size',
+      'Nested project Inspect shows the enclosing protected aggregate',
       'Personal protection interaction', 'VHDX and nested Git protect enclosing build aggregate',
       'Intrinsic protection cannot be removed by personal-protection toggle',
       'Fixture content and modification times unchanged', 'No observed page errors'],

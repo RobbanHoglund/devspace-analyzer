@@ -20,17 +20,19 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run icons
       - name: Frontend unit tests
         run: npm test
       - name: Typecheck and production frontend build
         run: npm run build
       - name: Rust unit and regression tests
-        run: cargo test -p devspace-core
+        run: cargo test --locked -p devspace-core
       - run: npx playwright install --with-deps chromium
       - name: Browser baseline and regression tests
         run: npm run test:ui
+      - name: Verify dependency locks remain unchanged
+        run: git diff --exit-code -- package-lock.json Cargo.lock
       - name: Package source snapshot
         if: always()
         run: |
@@ -61,19 +63,21 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run icons
       - name: Frontend unit tests
         run: npm test
       - name: Windows unit and regression tests including junctions
-        run: cargo test -p devspace-core
+        run: cargo test --locked -p devspace-core
       - name: Build Windows desktop and installer
-        run: npm run tauri -- build --bundles nsis
+        run: npm run tauri -- build --bundles nsis -- --locked
       - name: Prepare supported WebView2 runtime
         run: ./scripts/windows-test-runtime.ps1
       - name: Exercise actual desktop through WebView2
         timeout-minutes: 5
         run: ./scripts/windows-native-test.ps1
+      - name: Verify dependency locks remain unchanged
+        run: git diff --exit-code -- package-lock.json Cargo.lock
       - name: Retain native evidence
         if: always()
         uses: actions/upload-artifact@v4

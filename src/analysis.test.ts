@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bytes, effectiveRisk, markdownReport, pathsOverlap, redactedReport, summarize, treemap } from './analysis';
+import { bytes, effectiveRisk, findingsForProject, markdownReport, pathsOverlap, redactedReport, summarize, treemap } from './analysis';
 import { demoReport } from './demo';
 
 describe('logical sizes and candidate totals', () => {
@@ -23,6 +23,35 @@ describe('protection path boundaries', () => {
   it('uses path boundaries rather than plain string prefixes', () => { expect(pathsOverlap('C:\\work\\app', 'C:\\work\\apple')).toBe(false); expect(pathsOverlap('C:\\work\\app', 'C:\\work\\app\\node_modules')).toBe(true); });
   it('treats Windows paths case-insensitively and POSIX paths case-sensitively', () => { expect(pathsOverlap('C:\\WORK', 'c:/work/app')).toBe(true); expect(pathsOverlap('/Work', '/work/app')).toBe(false); });
   it('handles both roots and empty strings', () => { expect(pathsOverlap('/', '/work/app')).toBe(true); expect(pathsOverlap('', '/work')).toBe(false); });
+});
+describe('project inspection inside aggregates', () => {
+  const finding = (id: string, path: string, projectId: string | null, risk: 'review' | 'protected' = 'protected') =>
+    ({ ...demoReport().findings[0], id, path, projectId, risk });
+  it('includes own findings and the enclosing protected aggregate once, without changing accounting', () => {
+    const project = { id: 'nested', path: 'C:/work/build/tools' };
+    const findings = [finding('parent', 'C:/work/build', 'outer'), finding('own', project.path + '/.git', project.id), finding('other', 'C:/elsewhere', null)];
+    const before = JSON.stringify(findings); const totals = summarize(findings, []);
+    expect(findingsForProject(findings, project).map(f => f.id)).toEqual(['parent', 'own']);
+    expect(JSON.stringify(findings)).toBe(before); expect(summarize(findings, [])).toEqual(totals);
+  });
+  it('includes shared protected storage and an aggregate at the project root', () => {
+    const project = { id: 'nested', path: '/cache/repository/tools' };
+    const findings = [finding('shared', '/cache/repository', null), finding('same-root', project.path, 'outer')];
+    expect(findingsForProject(findings, project).map(f => f.id)).toEqual(['shared', 'same-root']);
+  });
+  it('does not include sibling prefixes, descendant findings owned by another project or unprotected ancestors', () => {
+    const project = { id: 'p', path: 'C:/work/apple' };
+    const findings = [finding('sibling', 'C:/work/app', null), finding('descendant', project.path + '/child/build', 'child'), finding('unprotected', 'C:/work', null, 'review')];
+    expect(findingsForProject(findings, project)).toEqual([]);
+  });
+  it('matches extended Windows paths without making POSIX paths case-insensitive', () => {
+    expect(findingsForProject([finding('win', '\\\\?\\C:\\WORK\\BUILD', null)], { id: 'p', path: 'c:/work/build/tools' })).toHaveLength(1);
+    expect(findingsForProject([finding('unix', '/Work/build', null)], { id: 'p', path: '/work/build/tools' })).toHaveLength(0);
+  });
+  it('does not treat empty paths as enclosing directories', () => {
+    expect(findingsForProject([finding('empty', '', null)], { id: 'p', path: '/work' })).toEqual([]);
+    expect(findingsForProject([finding('root', '/', null)], { id: 'p', path: '' })).toEqual([]);
+  });
 });
 describe('redaction and export', () => {
   it('strips sensitive strings from every free-text field', () => {

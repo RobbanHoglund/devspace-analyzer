@@ -6,7 +6,7 @@ This patch addresses R01–R06 from the review of 0.1.0. The original failing ex
 
 **R01 — Protected descendants.** Aggregate measurement applies protected-type and known-cache checks while traversing. Any protected descendant makes the whole enclosing finding protected, with category-specific evidence and recovery text. Explicit nested Git projects are recorded; their owned bytes are charged only to them, not to every ancestor. Dependency manifests alone do not create thousands of nested source projects. A single aggregate finding remains the size-accounting unit, so parent/child findings do not double count.
 
-This deliberately favors conservative protection over maximizing candidate totals. A protected aggregate can include ordinary generated output too. Nested projects inside it have owned-byte inventory, but their artifacts are not separately classified in this pilot, and their Inspect filter may have no independent findings. The enclosing aggregate must be inspected instead. Splitting such aggregates without weakening safety is later work.
+This deliberately favors conservative protection over maximizing candidate totals. A protected aggregate can include ordinary generated output too. Nested projects inside it have owned-byte inventory, but their artifacts are not separately classified in this pilot, and their Inspect view includes the existing enclosing protected findings with an explanation. No duplicate findings or reassigned bytes are added. Splitting such aggregates without weakening safety is later work.
 
 **R02 — Identity versus scope.** Known cache identities are resolved independently of automatic inclusion. Disabling the checkbox stops unrelated cache directories from entering the traversal roots, but explicitly selected known caches still classify correctly. User configuration files are read for this identity resolution even when automatic inclusion is off. The coverage view distinguishes effective roots from recognized locations that overlap them.
 
@@ -21,12 +21,12 @@ This deliberately favors conservative protection over maximizing candidate total
 ## Verification commands
 
 ```sh
-cargo test -p devspace-core
+cargo test --locked -p devspace-core
 npm test
 npm run build
 npx playwright install chromium
 npm run test:ui
-npm run tauri -- build --bundles nsis
+npm run tauri -- build --bundles nsis -- --locked
 ```
 
 On Windows, `scripts/windows-native-test.ps1` also runs the actual release application against temporary fixtures. It checks a real scan, a nested source repository, enclosing-aggregate protection for a VHDX, personal protection and unchanged fixture hashes/mtimes. The distributed app has no debug endpoint; automation flags belong only to the test process.
