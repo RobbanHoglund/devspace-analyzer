@@ -97,7 +97,7 @@ fn directory_protection_covers_equal_ancestor_and_descendant_scopes() {
 #[test]
 fn linked_personal_protection_is_rejected_without_following_the_alias() {
     let f = Fixture::new(); put(&f.root.join("package.json"), b"{}");
-    let local = f.root.join("node_modules/local"); put(&local.join("index.js"), b"patched");
+    let local = f.root.join("node_modules").join("local"); put(&local.join("index.js"), b"patched");
     let link = f.home.join("protected-alias");
     #[cfg(unix)]
     std::os::unix::fs::symlink(&local, &link).unwrap();
