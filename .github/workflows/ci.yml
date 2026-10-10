@@ -66,6 +66,9 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
       - name: Install frontend dependencies
         run: npm install --no-audit --no-fund
       - name: Generate application icons
@@ -76,16 +79,6 @@ jobs:
         run: cargo test -p devspace-core
       - name: Build Windows desktop and installer
         run: npm run tauri -- build --bundles nsis
-      - name: Exercise the actual desktop through WebView2
-        run: node scripts/native-smoke.mjs
-      - name: Retain native test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-windows-checks
-          path: artifacts/
-          if-no-files-found: warn
-          retention-days: 7
       - name: Retain Windows executables
         uses: actions/upload-artifact@v4
         with:
@@ -95,3 +88,16 @@ jobs:
             target/release/devspace-analyzer.exe
           if-no-files-found: error
           retention-days: 14
+      - name: Prepare the supported WebView2 runtime
+        run: ./scripts/windows-test-runtime.ps1
+      - name: Exercise the actual desktop through WebView2
+        timeout-minutes: 4
+        run: node scripts/native-smoke.mjs
+      - name: Retain native test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-checks
+          path: artifacts/
+          if-no-files-found: warn
+          retention-days: 7

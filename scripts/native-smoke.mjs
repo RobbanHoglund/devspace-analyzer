@@ -40,13 +40,13 @@ function snapshot(root) {
 }
 const before = snapshot(workspace);
 const endpoint = 'http://127.0.0.1:9337';
-// This debugging endpoint exists only in this CI test process. The application
-// itself does not enable a debugging port or ship a test-mode command.
+// The application does not enable a debugging endpoint. This environment setting
+// is limited to the automated test's child process and disposable profile.
 const child = spawn(executable, [], {
   env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
   stdio: ['ignore', 'pipe', 'pipe']
 });
-let processOutput = ''; let browser; let page; let processError;
+let processOutput = ''; let browser; let page; let processError; let lastProbe = '';
 child.stdout.on('data', data => { processOutput += data; });
 child.stderr.on('data', data => { processOutput += data; });
 child.on('error', error => { processError = error; });
@@ -55,10 +55,14 @@ try {
   for (let attempt = 0; attempt < 60; attempt++) {
     if (processError) throw processError;
     if (child.exitCode !== null) throw new Error(`Desktop application exited before initialization: ${child.exitCode}\n${processOutput}`);
-    try { const response = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1000) }); if (response.ok) { ready = true; break; } } catch {}
+    try {
+      const response = await fetch(`${endpoint}/json/version`, { signal: AbortSignal.timeout(1000) });
+      if (response.ok) { ready = true; break; }
+      lastProbe = `HTTP ${response.status}: ${await response.text()}`;
+    } catch (error) { lastProbe = `${error.message}: ${error.cause?.code ?? ''}`; }
     await new Promise(resolve => setTimeout(resolve, 1000));
   }
-  if (!ready) throw new Error(`WebView2 did not expose its test-only debugging endpoint.\n${processOutput}`);
+  if (!ready) throw new Error(`WebView2 did not expose its test-only debugging endpoint. Last probe: ${lastProbe}\n${processOutput}`);
   browser = await chromium.connectOverCDP(endpoint);
   const context = browser.contexts()[0];
   page = context.pages()[0] ?? await context.waitForEvent('page');
@@ -86,10 +90,13 @@ try {
   await page.screenshot({ path: join(artifacts, 'native-findings.png'), fullPage: true });
   expect(snapshot(workspace)).toEqual(before);
   expect(errors).toEqual([]);
-  const result = { passed: true, revision: process.env.GITHUB_SHA ?? 'local', platform: process.platform, browser: browser.version(), checks: ['Native desktop startup', 'No browser/demo fallback', 'Real Rust scan through the desktop UI', 'Three discovered projects and five findings', 'Expected Node dependency size', 'Personal protection interaction', 'Fixture content and modification times unchanged', 'No observed page errors'], notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation'] };
+  const result = { passed: true, revision: process.env.GITHUB_SHA ?? 'local', executableSha256: createHash('sha256').update(readFileSync(executable)).digest('hex'), platform: process.platform, browser: browser.version(), checks: ['Native desktop startup', 'No browser/demo fallback', 'Real Rust scan through the desktop UI', 'Three discovered projects and five findings', 'Expected Node dependency size', 'Personal protection interaction', 'Fixture content and modification times unchanged', 'No observed page errors'], notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation'] };
   writeFileSync(join(artifacts, 'native-smoke.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } catch (error) {
+  writeFileSync(join(artifacts, 'native-failure.txt'), String(error.stack ?? error));
+  const diagnostic = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/windows-diagnostics.ps1'], { encoding: 'utf8', timeout: 20000 });
+  writeFileSync(join(artifacts, 'native-diagnostics.log'), `${diagnostic.stdout ?? ''}\n${diagnostic.stderr ?? ''}`);
   if (page) await page.screenshot({ path: join(artifacts, 'native-failure.png'), fullPage: true }).catch(() => {});
   throw error;
 } finally {
