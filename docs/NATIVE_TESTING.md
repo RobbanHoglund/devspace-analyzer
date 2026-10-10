@@ -6,7 +6,7 @@ The native smoke test launches the actual release executable and controls its We
 
 WebView2 Runtime 150 and newer ignore the environment-supplied remote debugging flag when the host is elevated. GitHub Windows runners normally run elevated. This caused the initial test to time out despite the release application starting and displaying its interface correctly.
 
-`scripts/windows-native-test.ps1` runs the test at Medium integrity on the disposable Windows runner, following the upstream workaround. It grants checkout access only to the current runner account. The unchanged release application receives its test-only debugging environment and uses a disposable WebView profile. The test helper is not an application dependency and is not installed by the product installer.
+`scripts/windows-native-test.ps1` runs the test at Medium integrity on the disposable Windows runner, following the upstream workaround. Its portable gsudo 2.6.1 helper is downloaded from the official GitHub release into the runner's temporary directory and checked against the published SHA-256 before extraction. It grants checkout access only to the current runner account. The unchanged release application receives its test-only debugging environment and uses a disposable WebView profile. The test helper is not an application dependency and is not installed by the product installer.
 
 The delivered application does not enable a debugging port in its code or configuration. A configured native check must actually pass before native scan interaction is claimed as verified. The diagnostic workflow can test an existing, non-expired Windows artifact without rebuilding it; supply that workflow run's ID when starting the diagnostic workflow manually.
 
