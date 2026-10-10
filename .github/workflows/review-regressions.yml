@@ -1,0 +1,69 @@
+name: Pilot regression review
+on:
+  push:
+    branches: [review/pilot-regressions]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  core:
+    name: Review scanner (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Baseline unit tests
+        run: |
+          mkdir -p review-evidence
+          set -o pipefail
+          cargo test -p devspace-core --lib 2>&1 | tee review-evidence/core-baseline.txt
+      - name: New regression expectations
+        if: always()
+        run: |
+          mkdir -p review-evidence
+          set -o pipefail
+          cargo test -p devspace-core --test review_regressions -- --nocapture --test-threads=1 2>&1 | tee review-evidence/core-regressions.txt
+      - name: Retain evidence even when expectations fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-core-${{ matrix.os }}
+          path: |
+            review-evidence/
+            Cargo.lock
+          retention-days: 14
+  ui:
+    name: Review frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - name: Baseline frontend unit tests and production build
+        run: npm test && npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Existing browser tests
+        run: npx playwright test tests/ui/app.spec.ts --reporter=list
+      - name: New browser regression expectations
+        run: npx playwright test tests/ui/review-regressions.spec.ts --reporter=list
+      - name: Retain failure evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: review-ui
+          path: |
+            artifacts/
+            test-results/
+            package-lock.json
+          retention-days: 14
