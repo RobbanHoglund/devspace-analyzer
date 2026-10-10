@@ -1,0 +1,87 @@
+name: Pilot checks
+
+on:
+  push:
+    branches: [main, feature/pilot]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pilot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core-and-ui:
+    name: Core and browser UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate application icons
+        run: npm run icons
+      - name: Frontend unit tests
+        run: npm test
+      - name: Typecheck and production frontend build
+        run: npm run build
+      - name: Rust filesystem and analysis tests
+        run: cargo test -p devspace-core
+      - name: Install browser test runtime
+        run: npx playwright install --with-deps chromium
+      - name: Browser interaction tests and screenshots
+        run: npm run test:ui
+      - name: Package source snapshot
+        if: always()
+        run: |
+          mkdir -p artifacts
+          git archive --format=zip HEAD -o artifacts/devspace-source.zip
+      - name: Retain reports, screenshots and resolved dependency versions
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-checks
+          path: |
+            artifacts/
+            playwright-report/
+            test-results/
+            package-lock.json
+            Cargo.lock
+          retention-days: 7
+
+  windows:
+    name: Windows x64 desktop
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install frontend dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate application icons
+        run: npm run icons
+      - name: Frontend unit tests
+        run: npm test
+      - name: Windows filesystem tests including junction handling
+        run: cargo test -p devspace-core
+      - name: Build Windows desktop and installer
+        run: npm run tauri -- build --bundles nsis
+      - name: Retain Windows executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: devspace-windows-x64
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/devspace-analyzer.exe
+          if-no-files-found: error
+          retention-days: 14
