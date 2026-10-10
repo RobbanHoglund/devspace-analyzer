@@ -1,18 +1,14 @@
 name: Pilot checks
-
 on:
   push:
-    branches: [main, feature/pilot]
+    branches: [main, feature/pilot, fix/pilot-review-001]
   pull_request:
   workflow_dispatch:
-
 permissions:
   contents: read
-
 concurrency:
   group: pilot-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
-
 jobs:
   core-and-ui:
     name: Core and browser UI
@@ -24,26 +20,23 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
-      - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
-      - name: Generate application icons
-        run: npm run icons
+      - run: npm install --no-audit --no-fund
+      - run: npm run icons
       - name: Frontend unit tests
         run: npm test
       - name: Typecheck and production frontend build
         run: npm run build
-      - name: Rust filesystem and analysis tests
+      - name: Rust unit and regression tests
         run: cargo test -p devspace-core
-      - name: Install browser test runtime
-        run: npx playwright install --with-deps chromium
-      - name: Browser interaction tests and screenshots
+      - run: npx playwright install --with-deps chromium
+      - name: Browser baseline and regression tests
         run: npm run test:ui
       - name: Package source snapshot
         if: always()
         run: |
           mkdir -p artifacts
           git archive --format=zip HEAD -o artifacts/devspace-source.zip
-      - name: Retain reports, screenshots and resolved dependency versions
+      - name: Retain reports and resolved dependencies
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -54,8 +47,7 @@ jobs:
             test-results/
             package-lock.json
             Cargo.lock
-          retention-days: 7
-
+          retention-days: 14
   windows:
     name: Windows x64 desktop
     runs-on: windows-latest
@@ -69,17 +61,27 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
-      - name: Install frontend dependencies
-        run: npm install --no-audit --no-fund
-      - name: Generate application icons
-        run: npm run icons
+      - run: npm install --no-audit --no-fund
+      - run: npm run icons
       - name: Frontend unit tests
         run: npm test
-      - name: Windows filesystem tests including junction handling
+      - name: Windows unit and regression tests including junctions
         run: cargo test -p devspace-core
       - name: Build Windows desktop and installer
         run: npm run tauri -- build --bundles nsis
-      - name: Retain Windows executables
+      - name: Prepare supported WebView2 runtime
+        run: ./scripts/windows-test-runtime.ps1
+      - name: Exercise actual desktop through WebView2
+        timeout-minutes: 5
+        run: ./scripts/windows-native-test.ps1
+      - name: Retain native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-checks
+          path: artifacts/
+          retention-days: 14
+      - name: Retain verified Windows executables
         uses: actions/upload-artifact@v4
         with:
           name: devspace-windows-x64
@@ -88,16 +90,3 @@ jobs:
             target/release/devspace-analyzer.exe
           if-no-files-found: error
           retention-days: 14
-      - name: Prepare the supported WebView2 runtime
-        run: ./scripts/windows-test-runtime.ps1
-      - name: Exercise the actual desktop through WebView2
-        timeout-minutes: 5
-        run: ./scripts/windows-native-test.ps1
-      - name: Retain native test evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: native-windows-checks
-          path: artifacts/
-          if-no-files-found: warn
-          retention-days: 7

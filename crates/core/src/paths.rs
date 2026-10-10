@@ -1,4 +1,4 @@
-use std::{fs, io::{self, Read}, path::{Component, Path, PathBuf}};
+use std::{fs, io::Read, path::{Component, Path, PathBuf}};
 
 pub fn display(path: &Path) -> String { path.to_string_lossy().into_owned() }
 pub fn key(path: &Path) -> String {
@@ -21,18 +21,21 @@ pub fn is_link(meta: &fs::Metadata) -> bool {
     }
     false
 }
-/// Refuse links in every existing ancestor, including explicitly selected roots.
-/// This is a non-adversarial snapshot check, not a race-free filesystem sandbox.
+/// Check ancestors from the root down, stopping BEFORE querying a leaf through
+/// a linked ancestor. Snapshot checks are not a race-free filesystem sandbox.
 pub fn safe_path(path: &Path) -> bool {
-    path.ancestors().filter(|p| !p.as_os_str().is_empty()).all(|p| {
-        fs::symlink_metadata(p).map(|m| !is_link(&m)).unwrap_or(false)
-    })
+    let mut current = PathBuf::new();
+    for component in path.components() {
+        current.push(component.as_os_str());
+        #[cfg(windows)]
+        if matches!(component, Component::Prefix(_)) { continue; }
+        if fs::symlink_metadata(&current).map(|m| is_link(&m)).unwrap_or(true) { return false; }
+    }
+    !current.as_os_str().is_empty()
 }
 pub fn normalize(path: &Path) -> Result<PathBuf, String> {
     if !path.is_absolute() { return Err("Choose an absolute local directory.".into()); }
-    if path.components().any(|c| matches!(c, Component::ParentDir)) {
-        return Err("Parent-directory components are not accepted.".into());
-    }
+    if path.components().any(|c| matches!(c, Component::ParentDir)) { return Err("Parent-directory components are not accepted.".into()); }
     #[cfg(windows)]
     {
         use std::path::Prefix;
@@ -45,8 +48,12 @@ pub fn normalize(path: &Path) -> Result<PathBuf, String> {
     if !full.is_dir() { return Err("The selected path is not a directory.".into()); }
     Ok(full)
 }
+/// Marker probes use the same no-follow boundary as traversal and text reads.
 pub fn regular(path: &Path) -> bool {
-    fs::symlink_metadata(path).map(|m| m.is_file() && !is_link(&m)).unwrap_or(false)
+    safe_path(path) && fs::symlink_metadata(path).map(|m| m.is_file() && !is_link(&m)).unwrap_or(false)
+}
+pub fn git_marker(path: &Path) -> bool {
+    safe_path(path) && fs::symlink_metadata(path).map(|m| (m.is_dir() || m.is_file()) && !is_link(&m)).unwrap_or(false)
 }
 /// Only called for allowlisted manifests/configuration fields. Never stores raw contents.
 pub fn small_text(path: &Path) -> Option<String> {
@@ -56,9 +63,4 @@ pub fn small_text(path: &Path) -> Option<String> {
     let mut text = String::new();
     fs::File::open(path).ok()?.take(65_537).read_to_string(&mut text).ok()?;
     (text.len() <= 65_536).then_some(text)
-}
-pub fn child_names(path: &Path) -> io::Result<Vec<String>> {
-    fs::read_dir(path)?.take(10_001).map(|entry| {
-        entry.map(|e| e.file_name().to_string_lossy().into_owned())
-    }).collect()
 }
