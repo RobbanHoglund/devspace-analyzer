@@ -1,0 +1,92 @@
+name: Pilot checks
+on:
+  push:
+    branches: [main, feature/pilot, fix/pilot-review-001]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pilot-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  core-and-ui:
+    name: Core and browser UI
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - run: npm install --no-audit --no-fund
+      - run: npm run icons
+      - name: Frontend unit tests
+        run: npm test
+      - name: Typecheck and production frontend build
+        run: npm run build
+      - name: Rust unit and regression tests
+        run: cargo test -p devspace-core
+      - run: npx playwright install --with-deps chromium
+      - name: Browser baseline and regression tests
+        run: npm run test:ui
+      - name: Package source snapshot
+        if: always()
+        run: |
+          mkdir -p artifacts
+          git archive --format=zip HEAD -o artifacts/devspace-source.zip
+      - name: Retain reports and resolved dependencies
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pilot-checks
+          path: |
+            artifacts/
+            playwright-report/
+            test-results/
+            package-lock.json
+            Cargo.lock
+          retention-days: 14
+  windows:
+    name: Windows x64 desktop
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+      - run: npm install --no-audit --no-fund
+      - run: npm run icons
+      - name: Frontend unit tests
+        run: npm test
+      - name: Windows unit and regression tests including junctions
+        run: cargo test -p devspace-core
+      - name: Build Windows desktop and installer
+        run: npm run tauri -- build --bundles nsis
+      - name: Prepare supported WebView2 runtime
+        run: ./scripts/windows-test-runtime.ps1
+      - name: Exercise actual desktop through WebView2
+        timeout-minutes: 5
+        run: ./scripts/windows-native-test.ps1
+      - name: Retain native evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-windows-checks
+          path: artifacts/
+          retention-days: 14
+      - name: Retain verified Windows executables
+        uses: actions/upload-artifact@v4
+        with:
+          name: devspace-windows-x64
+          path: |
+            target/release/bundle/nsis/*.exe
+            target/release/devspace-analyzer.exe
+          if-no-files-found: error
+          retention-days: 14
