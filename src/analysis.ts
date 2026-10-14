@@ -1,4 +1,4 @@
-import type { Finding, Report, Risk } from './types';
+import type { Finding, Project, Report, Risk } from './types';
 
 export function bytes(value: number): string {
   if (!Number.isFinite(value) || value < 0) return 'Unknown';
@@ -20,6 +20,16 @@ export function pathsOverlap(a: string, b: string): boolean {
   if (!x || !y) return false;
   const under = (p: string, root: string) => p === root || p.startsWith(root.endsWith('/') ? root : `${root}/`);
   return under(x, y) || under(y, x);
+}
+/** Include existing enclosing protected findings without reassigning ownership or bytes. */
+export function findingsForProject(findings: Finding[], project: Pick<Project, 'id' | 'path'>): Finding[] {
+  const projectPath = pathKey(project.path);
+  return findings.filter(f => {
+    if (f.projectId === project.id) return true;
+    const enclosing = pathKey(f.path);
+    return f.risk === 'protected' && !!enclosing && !!projectPath &&
+      (projectPath === enclosing || projectPath.startsWith(enclosing.endsWith('/') ? enclosing : `${enclosing}/`));
+  });
 }
 export function isProtected(finding: Finding, protectedPaths: string[]): boolean {
   return finding.risk === 'protected' || protectedPaths.some(path => pathsOverlap(path, finding.path));

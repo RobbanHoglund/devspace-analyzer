@@ -109,8 +109,13 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
             "At most 5 million entries, 20,000 findings, 10,000 projects and 128 directory levels are scanned. At most 500 warning details are retained.".into(),
         ],
     };
-    let protected = request.protected_paths.iter().filter_map(|p| normalize(Path::new(p)).ok()).collect();
-    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected };
+    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![] };
+    for raw in request.protected_paths {
+        match normalize(Path::new(&raw)) {
+            Ok(path) => s.protected.push(path),
+            Err(message) => s.warn(Path::new(&raw), "invalid-protection", &format!("{message} Personal protection accepts existing local directories; scanner validation did not apply this entry.")),
+        }
+    }
     for warning in discovery.warnings { s.warn(Path::new(&warning.path), &warning.code, &warning.message); }
     let mut roots = vec![];
     for raw in request.roots {

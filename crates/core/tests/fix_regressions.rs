@@ -59,6 +59,62 @@ fn r01_same_path_cache_alias_cannot_downgrade_maven_protection() {
     assert_eq!(r.findings[0].kind, "maven-repository"); assert_eq!(r.progress.logical_bytes, 79);
 }
 #[test]
+fn rejected_personal_protection_is_diagnosed_without_dropping_valid_entries() {
+    let f = Fixture::new(); put(&f.root.join("package.json"), b"{}");
+    let local = f.root.join("node_modules/local"); put(&local.join("index.js"), b"patched");
+    let r = scan_with_environment(ScanRequest {
+        roots: vec![f.root.to_string_lossy().into_owned()], include_global_caches: false,
+        protected_paths: vec![local.to_string_lossy().into_owned(), local.join("index.js").to_string_lossy().into_owned(), f.home.join("missing").to_string_lossy().into_owned(), "relative".into()],
+    }, &f.env(), &AtomicBool::new(false), |_| {}).unwrap();
+    assert!(!r.complete); assert_eq!(r.warning_count, 3);
+    assert!(r.warnings.iter().all(|w| w.code == "invalid-protection" && w.message.contains("existing local directories")));
+    assert_eq!(r.findings.len(), 1); assert!(r.findings[0].user_protected); assert!(r.findings[0].complete);
+    assert_eq!(r.progress.logical_bytes, 9);
+}
+#[test]
+fn rejected_protection_warning_details_stay_bounded_and_scan_continues() {
+    let f = Fixture::new(); put(&f.root.join("package.json"), b"{}");
+    let r = scan_with_environment(ScanRequest {
+        roots: vec![f.root.to_string_lossy().into_owned()], include_global_caches: false,
+        protected_paths: vec![String::new(); 600],
+    }, &f.env(), &AtomicBool::new(false), |_| {}).unwrap();
+    assert!(!r.complete); assert_eq!(r.warning_count, 600); assert_eq!(r.warnings.len(), 500);
+    assert!(r.warnings.iter().all(|w| w.code == "invalid-protection"));
+    assert_eq!(r.projects.len(), 1); assert_eq!(r.progress.logical_bytes, 2);
+}
+#[test]
+fn directory_protection_covers_equal_ancestor_and_descendant_scopes() {
+    let f = Fixture::new(); put(&f.root.join("package.json"), b"{}");
+    let modules = f.root.join("node_modules"); let local = modules.join("local"); put(&local.join("index.js"), b"patched");
+    for path in [&f.root, &modules, &local] {
+        let r = scan_with_environment(ScanRequest {
+            roots: vec![f.root.to_string_lossy().into_owned()], include_global_caches: false,
+            protected_paths: vec![path.to_string_lossy().into_owned()],
+        }, &f.env(), &AtomicBool::new(false), |_| {}).unwrap();
+        assert!(r.complete); assert_eq!(r.warning_count, 0); assert!(r.findings[0].user_protected);
+    }
+}
+#[test]
+fn linked_personal_protection_is_rejected_without_following_the_alias() {
+    let f = Fixture::new(); put(&f.root.join("package.json"), b"{}");
+    let local = f.root.join("node_modules").join("local"); put(&local.join("index.js"), b"patched");
+    let link = f.home.join("protected-alias");
+    #[cfg(unix)]
+    std::os::unix::fs::symlink(&local, &link).unwrap();
+    #[cfg(windows)]
+    assert!(std::process::Command::new("cmd").args(["/C", "mklink", "/J"]).arg(&link).arg(&local).status().unwrap().success());
+    let r = scan_with_environment(ScanRequest {
+        roots: vec![f.root.to_string_lossy().into_owned()], include_global_caches: false,
+        protected_paths: vec![link.to_string_lossy().into_owned()],
+    }, &f.env(), &AtomicBool::new(false), |_| {}).unwrap();
+    #[cfg(windows)]
+    fs::remove_dir(&link).unwrap();
+    #[cfg(unix)]
+    fs::remove_file(&link).unwrap();
+    assert_eq!(r.progress.logical_bytes, 9); assert_eq!(r.warning_count, 1);
+    assert_eq!(r.warnings[0].code, "invalid-protection"); assert!(!r.findings[0].user_protected);
+}
+#[test]
 fn r02_auto_off_never_measures_unrelated_known_caches() {
     let f = Fixture::new(); let maven = f.home.join(".m2/repository"); put(&maven.join("local.jar"), &[1; 99]);
     put(&f.home.join(".gradle/caches/8.14.3/other.bin"), &[2; 57]);

@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 pub struct ScanRequest {
     pub roots: Vec<String>,
     pub include_global_caches: bool,
+    /// Existing local directories; rejected entries produce coverage warnings.
     pub protected_paths: Vec<String>,
 }
 impl Default for ScanRequest {

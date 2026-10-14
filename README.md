@@ -26,19 +26,19 @@ A successful **Windows x64 desktop** job publishes `devspace-windows-x64`, conta
 To build from source, install Node.js 22.12+, stable Rust/MSVC, Microsoft C++ Build Tools and WebView2 as described in the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
 ```powershell
-git clone --branch fix/pilot-review-001 git@github.com:RobbanHoglund/devspace-analyzer.git
+git clone --branch main git@github.com:RobbanHoglund/devspace-analyzer.git
 cd devspace-analyzer
-npm install
+npm ci
 npm run tauri -- dev
 ```
 
-Build the installer with `npm run tauri -- build --bundles nsis`. Icons are generated locally; no icon or font downloads are needed.
+Build the installer with `npm run tauri -- build --bundles nsis -- --locked`. Icons are generated locally; no icon or font downloads are needed.
 
 For the first scan, choose a repository parent folder such as `C:\ws\git`. Add shared caches through the optional checkbox, then inspect Findings and Scan coverage. Administrator privileges are not required; inaccessible areas are reported, not bypassed.
 
 ## Browser preview
 
-Run `npm install` and `npm run dev`, open `http://127.0.0.1:1420`, then select **Explore demo**. The preview does not scan the filesystem and never claims that synthetic figures came from this computer.
+Run `npm ci` and `npm run dev`, open `http://127.0.0.1:1420`, then select **Explore demo**. The preview does not scan the filesystem and never claims that synthetic figures came from this computer.
 
 ## Interpreting results
 
@@ -50,7 +50,7 @@ Run `npm install` and `npm run dev`, open `http://127.0.0.1:1420`, then select *
 | Owned project size | File lengths charged exclusively to that project, excluding nested source projects |
 | Measured files | Files in the effective traversal roots, including unclassified data |
 
-Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this pilot.
+Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this pilot. Their Inspect view includes the existing enclosing protected finding with an explanation, without adding findings or reassigning bytes.
 
 ## Safety and scope
 
@@ -67,7 +67,7 @@ See [Safety and privacy](docs/SAFETY.md), [native verification](docs/NATIVE_TEST
 ## Development
 
 ```sh
-cargo test -p devspace-core
+cargo test --locked -p devspace-core
 npm test
 npm run build
 npx playwright install chromium
@@ -76,7 +76,7 @@ npm run test:ui
 
 Normal CI runs original and review regression tests on Linux/Windows, frontend tests/build, browser interaction tests, Windows packaging and a real native scan. `scripts/windows-native-test.ps1` exercises the release executable at normal user integrity. Large-workspace benchmarks/cancellation, native file-dialog interaction and installer installation/uninstallation remain separate validation tasks.
 
-Dependency ranges are currently resolved by npm and Cargo. CI retains generated lockfiles; commit validated lock snapshots before promoting beyond the pilot stage.
+Dependency snapshots in `package-lock.json` and `Cargo.lock` come from the verified main CI run [38050353533](https://github.com/RobbanHoglund/devspace-analyzer/actions/runs/38050353533). Use `npm ci` and Cargo `--locked`; CI enforces both, including native packaging. Lockfiles pin dependency resolution, not compiler versions, installer signatures or byte-identical binaries. Update them explicitly and verify on Linux and Windows.
 
 ```text
 crates/core/    Read-only scanner, cache discovery, rules and regression fixtures
