@@ -93,8 +93,38 @@ export function redactedReport(report: Report): Report {
 }
 function markdownText(value: string) { return value.replace(/[\\`*_{}\[\]<>#!|]/g, '\\$&').replace(/[\r\n]/g, ' '); }
 export function markdownReport(report: Report, origin: 'native' | 'demo'): string {
-  const rows = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes).map(f =>
-    `| ${markdownText(f.label)} | ${bytes(f.logicalBytes)} | ${f.userProtected ? 'protected' : f.risk} | ${markdownText(f.path)} |`
-  );
-  return `# DevSpace Analyzer report\n\nOrigin: ${origin === 'demo' ? 'DEMO — synthetic data, not this computer' : 'Local native scan'}\n\nScan: ${new Date(report.startedAt * 1000).toISOString()}\n\nStatus: ${report.cancelled ? 'Cancelled; partial results' : report.complete ? 'Completed within scope' : 'Partial coverage; review warnings'}\n\n${report.sizeBasis}\n\nFiles measured: ${report.progress.files}\n\nWarnings: ${report.warningCount}\n\n## Findings\n\n| Finding | Logical size | Risk | Path |\n|---|---:|---|---|\n${rows.join('\n')}\n\n## Limitations\n\n${report.limitations.map(s => `- ${markdownText(s)}`).join('\n')}\n\nNo files were deleted. Review the detailed local evidence before taking any action.\n`;
+  const rows = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes).map(f => {
+    const risk = f.userProtected ? 'protected' : f.risk;
+    const size = `${bytes(f.logicalBytes)}${f.complete ? '' : ' (partial)'}`;
+    const candidate = f.complete && risk !== 'protected';
+    return `| ${markdownText(f.label)} | ${size} | ${f.complete ? 'Complete' : 'Partial'} | ${risk} | ${candidate ? 'Yes' : 'No'} | ${markdownText(f.path)} |`;
+  });
+  return `# DevSpace Analyzer report
+
+Origin: ${origin === 'demo' ? 'DEMO — synthetic data, not this computer' : 'Local native scan'}
+
+Scan: ${new Date(report.startedAt * 1000).toISOString()}
+
+Status: ${report.cancelled ? 'Cancelled; partial results' : report.complete ? 'Completed within scope' : 'Partial coverage; review warnings'}
+
+${report.sizeBasis}
+
+Files measured: ${report.progress.files}
+
+Warnings: ${report.warningCount}
+
+## Findings
+
+Partial sizes include only the files measured, not unread or skipped entries. Incomplete findings are excluded from review candidates. A review candidate is a complete, unprotected finding requiring further review, not approval to delete.
+
+| Finding | Logical size | Measurement | Risk | Review candidate | Path |
+|---|---:|---|---|---|---|
+${rows.join('\n')}
+
+## Limitations
+
+${report.limitations.map(s => `- ${markdownText(s)}`).join('\n')}
+
+No files were deleted. Review the detailed local evidence before taking any action.
+`;
 }

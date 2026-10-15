@@ -34,6 +34,8 @@ Checks are snapshot-based path checks, not a race-free sandbox. A concurrently c
 
 Read errors, skipped entries, depth limits, entry limits and cancellation reduce coverage. The UI exposes this; findings with incomplete subtree measurements are excluded from the review-candidate total. Other complete findings can still be shown in a globally partial report.
 
+Markdown exports retain this distinction per finding: measurement status, a partial-size label when needed, effective risk and review-candidate eligibility. Both full and redacted exports exclude incomplete or protected findings from candidate eligibility. A completed finding can remain a candidate in a globally partial or cancelled report; this is still a request for further review, never deletion approval.
+
 ## Byte accounting
 
 All sizes are **logical file lengths**. A hardlinked file encountered at two different paths contributes at each path. Compression, sparse files, filesystem metadata, allocation unit rounding and reflinks are not measured. Deleting one hardlink may release no storage; deleting an internal virtual-disk cache may not shrink the host file. Do not interpret a candidate total as a promise of freed SSD space.
