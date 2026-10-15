@@ -7,6 +7,7 @@ import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, 
 import { demoReport } from './demo';
 import { pageBounds } from './pagination';
 import { scopeKey, type ScanScope } from './scanScope';
+import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectInventory';
 import { ProtectionControls } from './ProtectionControls';
 
 type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
@@ -40,6 +41,7 @@ export default function App() {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const detailRef = useRef<HTMLElement>(null);
+  const [projectView, setProjectView] = useState<ProjectView>(emptyProjectView);
   const [roots, setRoots] = useState<string[]>(() => readPreference('devspace.roots').slice(0, 32));
   const [protectedPaths, setProtectedPaths] = useState<string[]>(() => readPreference('devspace.protected'));
   const [demoProtected, setDemoProtected] = useState<string[]>([]);
@@ -76,7 +78,7 @@ export default function App() {
     setQueryValue(view.query); setEcoValue(view.eco); setRiskValue(view.risk);
     setProjectFilterValue(view.projectFilter); setSortValue(view.sort); setPage(view.page); setSelected(view.selected);
   };
-  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean; scroll: Partial<Record<Tab, number>>; previousFindings: FindingView | null } | null>(null);
+  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; projectView: ProjectView; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean; scroll: Partial<Record<Tab, number>>; previousFindings: FindingView | null } | null>(null);
   const activeProtected = origin === 'demo' ? demoProtected : protectedPaths;
 
   useEffect(() => {
@@ -175,6 +177,7 @@ export default function App() {
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
       savedSession.current = null; previousFindings.current = null; setCanReturnToFindings(false); scrollPositions.current = {}; setPage(0);
+      setProjectView(emptyProjectView);
       setScopeExpanded(false);
       setReportScope({roots: [...roots], includeCaches});
       requestAnimationFrame(() => window.scrollTo({top:0}));
@@ -187,9 +190,10 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
-    if (report && origin === 'native') savedSession.current = { report, reportScope, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact, scroll: {...scrollPositions.current, [tab]:window.scrollY}, previousFindings:previousFindings.current };
+    if (report && origin === 'native') savedSession.current = { report, reportScope, projectView, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact, scroll: {...scrollPositions.current, [tab]:window.scrollY}, previousFindings:previousFindings.current };
     setPage(0); setCanReturnToFindings(false); previousFindings.current = null; scrollPositions.current = {};
     requestAnimationFrame(() => window.scrollTo({top:0}));
+    setProjectView(emptyProjectView);
     setReportScope(null);
     setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
@@ -198,6 +202,7 @@ export default function App() {
     setOrigin('native'); setError(''); setNotice('');
     scrollPositions.current = saved?.scroll ?? {}; previousFindings.current = saved?.previousFindings ?? null; setCanReturnToFindings(!!previousFindings.current);
     requestAnimationFrame(() => window.scrollTo({top:saved?.scroll[saved.tab] ?? 0}));
+    setProjectView(saved?.projectView ?? emptyProjectView);
     setReportScope(saved?.reportScope ?? null);
     setReport(saved?.report ?? null); setPreviousReport(saved?.previousReport ?? false);
     setTab(saved?.tab ?? 'overview');
@@ -310,7 +315,7 @@ export default function App() {
 
         {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} onClick={event => { if (!(event.target as HTMLElement).closest("button")) setSelected(f.id); }} className={selected === f.id ? 'selected' : ''}><td><button ref={element => { if (element) findingButtons.current.set(f.id, element); else findingButtons.current.delete(f.id); }} aria-controls="finding-detail-content" className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{compactDetails ? <dialog id="finding-detail-content" ref={drawerRef} className="finding-drawer" aria-label="Finding details" onCancel={event => { event.preventDefault(); closeFinding(); }}>{current && detailPanel}{drawerActive && feedback}</dialog> : detailPanel}</div>}
 
-        {tab === 'projects' && <section className="panel projects-panel"><div className="section-heading"><h2>Project inventory</h2><span className="muted">Owned bytes exclude nested projects</span></div><p className="muted">Manifests and Git markers are detected statically. The working tree and other branches are not evaluated.</p><div className="table-scroll"><table><thead><tr><th>Project / path</th><th>Build context</th><th>Dependency evidence</th><th className="number">Owned logical size</th><th></th></tr></thead><tbody>{report.projects.slice().sort((a, b) => b.ownedLogicalBytes - a.ownedLogicalBytes).map(p => <tr key={p.id}><td><strong>{p.name}</strong><small className="mono wrap">{visiblePath(p.path)}</small><small>{p.gitKind ?? 'No Git marker'}{p.branch ? ` · ${p.branch}` : ''}{p.workspace ? ' · workspace' : ''}</small></td><td><div className="tags">{p.ecosystems.map(e => <span key={e} className={`eco-label eco-${e}`}>{e}</span>)}</div>{p.wrapperVersion && <small>Gradle wrapper {p.wrapperVersion}</small>}</td><td>{p.lockfiles.length ? <><strong>{p.lockfiles.length} lockfile marker(s)</strong><small>{p.lockfiles.join(', ')}</small></> : <span className="muted">No recognized lockfile</span>}<small>Reproducibility not verified</small></td><td className="number"><strong>{bytes(p.ownedLogicalBytes)}</strong><small>{bytes(p.artifactBytes)} identified artifacts</small>{p.contextOnly && <small>Context from parent · sizes within selected scope only</small>}</td><td><button onClick={() => inspectProject(p.id)}>Inspect<Icon name="arrow"/></button></td></tr>)}</tbody></table></div>{!report.projects.length && <div className="empty-results">No project markers found. Shared-cache-only scans may have no projects.</div>}</section>}
+        {tab === 'projects' && <ProjectInventory projects={report.projects} view={projectView} onChange={setProjectView} onInspect={inspectProject}/>}
 
         {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><Badge risk={report.complete ? 'low' : 'review'}/></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><h3>Warnings ({report.warningCount.toLocaleString()})</h3><div className="warning-list">{report.warnings.map((w, i) => <div className="warning-item" key={i}><strong>{w.code}</strong><span className="mono">{visiblePath(w.path)}</span><p>{w.message}</p></div>)}{!report.warnings.length && <p>No skipped-entry warnings were recorded.</p>}</div>{report.warningCount > report.warnings.length && <p>Only the first {report.warnings.length} warning details are retained.</p>}</section></div>}
 
