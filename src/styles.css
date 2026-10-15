@@ -31,3 +31,7 @@
 .finding-drawer{position:fixed;inset:16px 16px 16px auto;margin:0;width:min(620px,calc(100vw - 32px));height:calc(100dvh - 32px);max-height:none;max-width:none;padding:0;border:1px solid #526378;border-radius:12px;background:var(--panel);color:var(--text);overflow:auto;box-shadow:0 20px 80px #0009}
 .finding-drawer::backdrop{background:#060e19b8}.finding-drawer .detail{position:static;border:0;max-height:none;overflow:visible}.finding-drawer .detail .section-heading{top:-20px}.finding-drawer .detail h2{font-size:23px}
 @media(max-width:1250px){.workspace-grid{grid-template-columns:1fr}.finding-button>span{max-width:440px}.finding-button{min-width:190px}.project-cell{max-width:160px}}
+
+.sidebar{z-index:25}.sidebar nav button{position:relative}.sidebar nav .nav-text{margin:0;background:transparent;padding:0;font-size:14px}.sidebar nav .nav-count{margin-left:auto}
+.sidebar nav .nav-tooltip{display:none}.results-panel tbody tr{cursor:pointer}.icon-button,.root-chip button{min-width:32px;min-height:32px}.icon-button{border-radius:6px}.icon-button:hover:not(:disabled){background:#253548}.root-chip{padding-right:0}
+@media(max-width:1000px){.sidebar nav .nav-text,.sidebar nav .nav-count{display:none}.sidebar nav button:hover .nav-tooltip,.sidebar nav button:focus .nav-tooltip{display:block;position:absolute;left:calc(100% + 10px);top:6px;background:#23364c;border:1px solid #526378;border-radius:6px;color:var(--text);padding:7px 12px;white-space:nowrap;font-size:13px;margin:0;box-shadow:0 4px 14px #0006}}
