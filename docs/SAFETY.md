@@ -6,6 +6,8 @@ The scanner uses directory enumeration, metadata and a bounded set of configurat
 
 The desktop shell stores its own local preferences. Scanner validation of personal protection accepts existing local directories. Files, missing paths, links and other rejected inputs produce `invalid-protection` coverage warnings without dropping valid protection entries or blocking the scan. The UI retains saved preferences conservatively; these warnings do not remove preferences or override intrinsic protection. **Open folder** starts the operating system file manager for a finding in the latest native scan. **Export** opens a native save dialog and creates a new `.json` or `.md` file; existing files are never overwritten. An interrupted export may leave an incomplete newly created report. These explicit actions are separate from scanning.
 
+Removing a finding's personal protection removes only its exact saved path rule. Protection inherited from a saved parent, or caused by a protected child, is shown separately with the saved path and the number of affected findings in the current report. Removing such a rule requires reviewing its scope and explicitly choosing to remove it for all covered paths; independent rules and intrinsic protection remain. Paths outside the current report may also be covered by the rule.
+
 Operating-system access timestamps and external software can still change while files are read. The read-only claim does not mean the complete operating system remains bit-for-bit unchanged.
 
 ## Classification is conservative

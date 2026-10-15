@@ -15,6 +15,14 @@ function pathKey(path: string): string {
   if (/^[A-Za-z]:\//.test(value)) value = value.toLowerCase();
   return value.length > 1 ? value.replace(/\/+$/, '') : value;
 }
+export function samePath(a: string, b: string): boolean {
+  const key = pathKey(a);
+  return !!key && key === pathKey(b);
+}
+/** Remove only the selected saved rule, never its ancestors or descendants. */
+export function removeProtectionRule(paths: string[], rule: string): string[] {
+  return paths.filter(path => !samePath(path, rule));
+}
 export function pathsOverlap(a: string, b: string): boolean {
   const x = pathKey(a), y = pathKey(b);
   if (!x || !y) return false;
