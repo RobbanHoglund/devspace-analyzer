@@ -88,7 +88,8 @@ export default function App() {
   const bounds = pageBounds(requestedPage, filtered.length);
   const page = bounds.page;
   useEffect(() => { if (requestedPage !== page) setPage(page); }, [page, requestedPage]);
-  const current = findings.find(f => f.id === selected);
+  const current = filtered.find(f => f.id === selected);
+  useEffect(() => { if (selected && !current) setSelected(null); }, [selected, current]);
   const top = findings.filter(f => !isProtected(f, activeProtected) && f.complete).sort((a, b) => b.logicalBytes - a.logicalBytes).slice(0, 3);
   const projectName = (id: string | null) => report?.projects.find(p => p.id === id)?.name ?? 'Shared / global';
   const hasFilters = !!query || eco !== 'all' || risk !== 'all' || projectFilter !== 'all';

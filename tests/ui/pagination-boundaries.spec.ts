@@ -30,9 +30,14 @@ for (const count of [0, 1, 50, 51, 100, 101]) {
     await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
     const remaining = count - 1; const expectedPage = Math.max(0, Math.ceil(remaining / 50) - 1);
     await expect(page.locator('tbody tr')).toHaveCount(remaining ? Math.min(50, remaining - expectedPage * 50) : 0);
+    // Leaving the active risk filter closes the finding, including on the last page.
+    await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toHaveCount(0);
+    await page.getByLabel('Risk filter').selectOption('protected');
+    await page.getByRole('button', { name: `Boundary fixture ${count - 1}`, exact: false }).click();
     await page.getByRole('button', { name: 'Remove personal protection', exact: true }).click();
-    // Unprotecting must not jump back to a formerly invalid page.
-    await expect(page.locator('.pagination')).toContainText(`${expectedPage * 50 + 1}–${Math.min(count, expectedPage * 50 + 50)} of ${count}`);
+    await expect(page.locator('tbody tr')).toHaveCount(0);
+    await page.getByLabel('Risk filter').selectOption('review');
+    await expect(page.locator('.pagination')).toContainText(`1–${Math.min(count, 50)} of ${count}`);
     await page.getByLabel('Search findings').fill('no-such-finding'); await expect(page.locator('tbody tr')).toHaveCount(0);
     await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
     await expect(page.locator('.pagination')).toContainText(`1–${Math.min(count, 50)} of ${count}`);
