@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
@@ -54,6 +54,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [redact, setRedact] = useState(true);
   const [exporting, setExporting] = useState(false);
+  const savedSession = useRef<{ report: Report; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean } | null>(null);
   const activeProtected = origin === 'demo' ? demoProtected : protectedPaths;
 
   useEffect(() => {
@@ -113,6 +114,7 @@ export default function App() {
     setBusy(true); setCancelling(false); setPreviousReport(!!report); setProgress(zero); setError(''); setNotice('');
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
+      savedSession.current = null;
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); setCancelling(false); }
@@ -122,7 +124,17 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
+    if (report && origin === 'native') savedSession.current = { report, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact };
     setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
+  }
+  function exitDemo() {
+    const saved = savedSession.current; savedSession.current = null;
+    setOrigin('native'); setError(''); setNotice('');
+    setReport(saved?.report ?? null); setPreviousReport(saved?.previousReport ?? false);
+    setTab(saved?.tab ?? 'overview'); setQuery(saved?.query ?? ''); setEco(saved?.eco ?? 'all');
+    setRisk(saved?.risk ?? 'all'); setProjectFilter(saved?.projectFilter ?? 'all');
+    setSort(saved?.sort ?? 'size'); setPage(saved?.page ?? 0); setSelected(saved?.selected ?? null);
+    setRedact(saved?.redact ?? true);
   }
   async function reveal(f: Finding) {
     if (busy) return;
@@ -191,7 +203,7 @@ export default function App() {
     <main>
       <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
       {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available only in the desktop application.</div>}
-      {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={() => { setReport(null); setOrigin('native'); setPreviousReport(false); setSelected(null); }}>Exit demo</button></div>}
+      {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={exitDemo}>Exit demo</button></div>}
       {previousReport && report && <div className="notice-banner" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
       {error && <div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
