@@ -6,7 +6,9 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const extensionRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.dirname(extensionRoot);
-const temporary = await realpath(await mkdtemp(path.join(tmpdir(), 'devspace-vsix-test-')));
+// macOS Unix-domain sockets have a 103-byte path limit; use a short isolated profile path.
+const temporaryBase = process.platform === 'darwin' ? '/private/tmp' : tmpdir();
+const temporary = await realpath(await mkdtemp(path.join(temporaryBase, 'ds-vsix-')));
 const restricted = process.argv.includes('--restricted');
 try {
   const fixture = path.join(temporary, 'workspace'); const extensions = path.join(temporary, 'extensions'); const profile = path.join(temporary, 'profile');

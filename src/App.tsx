@@ -51,6 +51,7 @@ export default function App() {
   const [origin, setOrigin] = useState<'native' | 'demo'>('native');
   const [tab, setTab] = useState<Tab>('overview');
   const [busy, setBusy] = useState(false);
+  const scanInFlight = useRef(false);
   const [unavailable, setUnavailable] = useState(bootstrap.unavailable ?? '');
   const hostAction = useRef<(action: HostAction) => void>(() => {});
   const [cancelling, setCancelling] = useState(false);
@@ -183,7 +184,8 @@ export default function App() {
     setRoots(old => [...new Set([...old, manualRoot.trim()])]); setManualRoot('');
   }
   async function startScan(scanRoots = roots) {
-    if (!native || busy || unavailable) return;
+    if (!native || scanInFlight.current || unavailable) return;
+    scanInFlight.current = true;
     setBusy(true); setCancelling(false); setPreviousReport(!!report); setProgress(zero); setError(''); setNotice('');
     try {
       const result = await invoke<Report>('scan', { request: { roots: scanRoots, includeGlobalCaches: includeCaches, protectedPaths } });
@@ -194,7 +196,7 @@ export default function App() {
       requestAnimationFrame(() => window.scrollTo({top:0}));
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
-    finally { setBusy(false); setCancelling(false); }
+    finally { scanInFlight.current = false; setBusy(false); setCancelling(false); }
   }
   async function cancel() {
     setCancelling(true);
@@ -247,7 +249,7 @@ export default function App() {
   hostAction.current = action => {
     if (action.availability !== undefined) setUnavailable(action.availability);
     if (action.tab) navigate(action.tab);
-    if (action.scanRoots && !busy) { setRoots(action.scanRoots); void startScan(action.scanRoots); }
+    if (action.scanRoots && !scanInFlight.current) { setRoots(action.scanRoots); void startScan(action.scanRoots); }
     if (action.cancel && busy) void cancel();
   };
 

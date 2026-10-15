@@ -1,7 +1,7 @@
 name: VS Code extension
 on:
   push:
-    branches: [main, feature/vscode-extension]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 permissions:
@@ -18,7 +18,7 @@ jobs:
         include:
           - os: windows-latest
             target: win32-x64
-          - os: ubuntu-latest
+          - os: ubuntu-22.04
             target: linux-x64
           - os: macos-15-intel
             target: darwin-x64
