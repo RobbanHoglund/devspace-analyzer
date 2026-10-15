@@ -46,9 +46,13 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.scanWorkspace');
     await waitFor(() => api.getStatus().complete === true, 'Real scanner did not return a complete report');
     assert.equal(api.getStatus().projects, 1); assert.ok(api.getStatus().findings >= 1);
+    await view.getByRole('region', { name: 'What your scan tells you' }).waitFor();
+    assert.equal(await view.getByRole('navigation').count(), 0, 'Navigation belongs in the native sidebar');
+    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-overview.png`) });
     assert.deepEqual(await readFile(fixtureFile), before.bytes); assert.equal((await stat(fixtureFile)).mtimeMs, before.mtime);
     await vscode.commands.executeCommand('devspace.findings');
     await view.getByRole('heading', { name: /Findings/ }).first().waitFor();
+    await waitFor(() => api.getStatus().activeTab === 'findings' && api.getStatus().selectedTab === 'findings', 'Native sidebar did not follow the active result view');
     await view.locator('.finding-button').first().click();
     await view.getByRole('heading', { name: /Node dependencies/ }).waitFor();
     await view.getByRole('button', { name: 'Close finding details' }).click();

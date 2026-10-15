@@ -26,21 +26,22 @@ class Navigation implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly change = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.change.event;
   description = 'Choose a folder to begin';
+  readonly views = new Map(tabs.map(([id, label, icon]) => {
+    const item = new vscode.TreeItem(label); item.id = id; item.iconPath = new vscode.ThemeIcon(icon);
+    item.command = { command: `devspace.${id}`, title: label }; return [id, item];
+  }));
   refresh(): void { this.change.fire(); }
   dispose(): void { this.change.dispose(); }
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
+  getParent(): undefined { return undefined; }
   getChildren(): vscode.TreeItem[] {
-    const items = tabs.map(([id, label, icon]) => {
-      const item = new vscode.TreeItem(label); item.iconPath = new vscode.ThemeIcon(icon);
-      item.command = { command: `devspace.${id}`, title: label }; return item;
-    });
     const scan = new vscode.TreeItem('Scan workspace'); scan.iconPath = new vscode.ThemeIcon('search');
     scan.command = { command: 'devspace.scanWorkspace', title: 'Scan workspace' };
     const folder = new vscode.TreeItem('Choose folder to scan…'); folder.iconPath = new vscode.ThemeIcon('folder-opened');
     folder.command = { command: 'devspace.scanFolder', title: 'Choose folder to scan' };
     const status = new vscode.TreeItem(this.description); status.iconPath = new vscode.ThemeIcon('info');
     status.tooltip = 'All reported sizes are logical bytes, not guaranteed recoverable disk space.';
-    return [...items, scan, folder, status];
+    return [...this.views.values(), scan, folder, status];
   }
 }
 
@@ -52,6 +53,8 @@ export class Analyzer implements vscode.Disposable {
   private reportScope?: ScanScope;
   private readonly scanner: Scanner;
   private readonly navigation = new Navigation();
+  private readonly tree: vscode.TreeView<vscode.TreeItem>;
+  private activeTab: Tab = 'overview';
   private readonly disposables: vscode.Disposable[] = [];
   private preferences: Preferences;
   private preferenceWrite: Promise<void> = Promise.resolve();
@@ -62,7 +65,8 @@ export class Analyzer implements vscode.Disposable {
     this.preferences = { roots: saved?.roots ?? roots, includeCaches: saved?.includeCaches ?? false, protectedPaths: context.globalState.get<string[]>('protectedPaths', []) };
     const binary = path.join(context.extensionPath, 'bin', process.platform === 'win32' ? 'devspace-scan.exe' : 'devspace-scan');
     this.scanner = new Scanner(binary, context.extensionPath);
-    this.disposables.push(vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation }));
+    this.tree = vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation });
+    this.disposables.push(this.tree, this.tree.onDidChangeVisibility(() => this.syncView()));
     this.disposables.push(vscode.workspace.onDidGrantWorkspaceTrust(() => this.event('host-action', { availability: unavailable() })));
     this.register('devspace.open', () => this.show());
     for (const [tab] of tabs) this.register(`devspace.${tab}`, () => this.action({ tab }));
@@ -129,11 +133,19 @@ export class Analyzer implements vscode.Disposable {
     });
   }
   private event(name: string, payload: unknown): void { if (this.panel) void this.panel.webview.postMessage({ type: 'event', name, payload }); }
+  private syncView(): void {
+    const item = this.navigation.views.get(this.activeTab);
+    if (item && this.tree.visible) void this.tree.reveal(item, { select: true, focus: false }).then(undefined, () => {});
+  }
   private async request(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
       case 'ready': {
         this.ready = true; const action = this.pending; this.pending = undefined;
         if (action) this.event('host-action', action); return null;
+      }
+      case 'set_view': {
+        if (!tabs.some(([tab]) => tab === args.tab)) throw new Error('Unknown DevSpace view.');
+        this.activeTab = args.tab as Tab; this.syncView(); return null;
       }
       case 'choose_folders': return this.folders();
       case 'save_preferences': {
@@ -180,7 +192,7 @@ export class Analyzer implements vscode.Disposable {
     }
   }
   /** Non-sensitive lifecycle status for consumers and integration checks. Reports stay in memory. */
-  getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete }; }
+  getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete, activeTab: this.activeTab, selectedTab: this.tree.selection[0]?.id }; }
   dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
 }
 

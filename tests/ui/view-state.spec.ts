@@ -18,7 +18,7 @@ test('demo round trip restores pagination after a filtered native report', async
   const r=demoReport();r.findings=Array.from({length:101},(_,i)=>({...r.findings[0],id:'item-'+i,label:'Item '+i}));
   await loadReport(page,r); await navigate(page,'Findings'); await page.getByLabel('Search findings').fill('Item');
   await page.getByRole('button',{name:'Next',exact:true}).click();
-  await page.getByRole('button',{name:'Explore demo',exact:true}).click(); await page.getByRole('button',{name:'Exit demo',exact:true}).click();
+  await page.getByRole('button',{name:'Scan settings',exact:true}).click(); await page.getByRole('button',{name:'Explore demo',exact:true}).click(); await page.getByRole('button',{name:'Exit demo',exact:true}).click();
   await expect(page.locator('.pagination')).toContainText('51–100 of 101');
 });
 

@@ -8,7 +8,7 @@ export function demoReport(): Report {
     { id: 'p2', name: 'data-lab', path: 'C:\\Workspaces\\data-lab', ecosystems: ['Python'], markers: ['pyproject.toml'], lockfiles: ['uv.lock'], gitKind: 'worktree', branch: null, wrapperVersion: null, workspace: false, ownedLogicalBytes: gib(1.9), artifactBytes: gib(1.75) }
   ];
   const add = (id: string, label: string, ecosystem: string, path: string, size: number, risk: Risk, projectId: string | null, reason: string, recovery: string, extra: Partial<Finding> = {}): Finding => ({
-    id, label, ecosystem, path, logicalBytes: gib(size), risk, projectId, reason, recovery, kind: 'demo-category', confidence: 'contextual', files: Math.round(size * 13_742), latestModified: 1788004800,
+    id, label, ecosystem, path, logicalBytes: gib(size), risk, projectId, reason, recovery, kind: ['gradle-cache', 'node-modules', 'maven-repository', 'virtual-disks', 'gradle-wrapper', 'python-venv', 'gradle-project', 'node-output', 'python-bytecode', 'git-metadata'][Number(id.slice(1))] ?? 'demo-category', confidence: 'contextual', files: Math.round(size * 13_742), latestModified: 1788004800,
     evidence: ['Synthetic demonstration finding; not measured on this computer.'], caveats: ['Source availability, tracked files and running tools must be checked before cleanup.', 'Logical bytes are not guaranteed space savings.'], complete: true, userProtected: false, wrapperVersion: null, wrapperReferences: [], ...extra
   });
   const findings = [

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.1
+
+- Explain each scan with a clear takeaway and concrete checks for its largest review candidates.
+- Show how review candidates, protected data, incomplete findings and unclassified files add up to the measured total.
+- Distinguish Gradle build output from the project's local cache and put review steps beside folder actions.
+- Use the native sidebar as the single navigation surface, with selection following the active analysis view.
+- Compact scan/export controls and improve wide detail panels and narrow editor layouts.
+
 ## 0.1.0
 
 - First installable VS Code pilot, reusing the DevSpace Rust scanner and React analysis views.

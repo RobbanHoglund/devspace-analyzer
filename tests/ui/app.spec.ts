@@ -40,6 +40,7 @@ test('projects link to scoped findings and coverage explains missing data', asyn
 });
 test('redacted demo export omits paths and keeps demo origin', async ({ page }) => {
   await loadDemo(page); const pending = page.waitForEvent('download');
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', { name: 'Export JSON' }).click(); const download = await pending;
   const stream = await download.createReadStream(); let content = '';
   for await (const chunk of stream!) content += chunk.toString();

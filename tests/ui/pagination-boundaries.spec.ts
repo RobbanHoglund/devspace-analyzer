@@ -42,7 +42,7 @@ for (const count of [0, 1, 50, 51, 100, 101]) {
     await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
     await expect(page.locator('.pagination')).toContainText(`1–${Math.min(count, 50)} of ${count}`);
     if (count > 50) await page.getByRole('button', { name: 'Next', exact: true }).click();
-    await page.getByRole('button', { name: 'Explore demo', exact: true }).click();
+    await page.getByRole('button', { name: 'Scan settings', exact: true }).click();await page.getByRole('button', { name: 'Explore demo', exact: true }).click();
     await page.getByRole('button', { name: 'Findings', exact: false }).first().click();
     await expect(page.locator('.pagination')).toContainText(`1–${Math.min(count, 50)} of ${count}`);
   });

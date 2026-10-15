@@ -38,8 +38,11 @@ for (const width of [380, 760, 1440]) {
     const request = JSON.parse(await page.evaluate(() => localStorage.getItem('vscode-request')!));
     expect(request.request.includeGlobalCaches).toBe(false);
     await expect(page.getByText('Browser preview', { exact: false })).toHaveCount(0);
-    for (const name of ['Overview', 'Findings', 'Projects', 'Scan coverage']) {
-      await page.getByRole('navigation').getByRole('button', { name, exact: true }).click();
+    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await page.screenshot({ path: `test-results/vscode-overview-${width}.png`, fullPage: true });
+    for (const [tab, name] of [['overview', 'Overview'], ['findings', 'Findings'], ['projects', 'Projects'], ['coverage', 'Scan coverage']]) {
+      await page.evaluate(tab => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab } } })), tab);
+      await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
       const overflow = await page.evaluate(() => ({
         width: innerWidth, document: document.documentElement.scrollWidth,
         elements: [...document.querySelectorAll('body *')].map(e => ({ tag:e.tagName, class:e.className, x:e.getBoundingClientRect().x, right:e.getBoundingClientRect().right })).filter(e => e.right > innerWidth + 1).slice(0,20),
@@ -47,7 +50,8 @@ for (const width of [380, 760, 1440]) {
       if (overflow.document > overflow.width + 1) console.log('VS_CODE_OVERFLOW', name, JSON.stringify(overflow));
       expect(overflow.document, `Overflow in ${name}`).toBeLessThanOrEqual(overflow.width + 1);
     }
-    await page.getByRole('navigation').getByRole('button', { name: 'Findings', exact: true }).click();
+    await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab: 'findings' } } })));
+    await expect(page.getByLabel('Ecosystem filter')).toBeVisible();
     const label = await page.locator('.finding-button strong').first().innerText();
     await page.locator('.finding-button').first().click();
     await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();

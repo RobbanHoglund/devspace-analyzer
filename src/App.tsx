@@ -5,7 +5,10 @@ import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, 
 import { demoReport } from './demo';
 import { pageBounds } from './pagination';
 import { scopeKey, type ScanScope } from './scanScope';
+import { findingTitle, reviewStep, reviewLabel } from './insights';
 import { unclassifiedMeasuredBytes } from './measurement';
+import { ScanSummary } from './ScanSummary';
+import { ResultInsights } from './ResultInsights';
 import { WarningBrowser, emptyWarningView, type WarningView } from './WarningBrowser';
 import { ExportControls } from './ExportControls';
 import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectInventory';
@@ -50,6 +53,9 @@ export default function App() {
   const [previousReport, setPreviousReport] = useState(false);
   const [origin, setOrigin] = useState<'native' | 'demo'>('native');
   const [tab, setTab] = useState<Tab>('overview');
+  useEffect(() => {
+    if (inVSCode) void invoke('set_view', { tab }).catch(() => {});
+  }, [tab]);
   const [busy, setBusy] = useState(false);
   const scanInFlight = useRef(false);
   const [unavailable, setUnavailable] = useState(bootstrap.unavailable ?? '');
@@ -113,9 +119,7 @@ export default function App() {
   const scopeChanged = origin === 'native' && !!reportScope && scopeKey(reportScope) !== scopeKey({roots, includeCaches});
   const scanState = report?.cancelled ? 'cancelled' : report?.complete ? 'complete' : 'partial';
   const scanLabel = report?.cancelled ? 'Cancelled · partial results' : report?.complete ? 'Completed within scope' : report?.warningCount ? `${report.warningCount} coverage warning${report.warningCount === 1 ? '' : 's'}` : 'Partial coverage';
-  const unclassified = report ? unclassifiedMeasuredBytes(report) : null;
   const findings = report?.findings ?? [];
-  const summary = useMemo(() => summarize(findings, activeProtected), [findings, activeProtected]);
   const groups = useMemo(() => {
     const sizes = new Map<string, number>(); findings.forEach(f => sizes.set(f.ecosystem, (sizes.get(f.ecosystem) ?? 0) + f.logicalBytes));
     return [...sizes].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
@@ -126,9 +130,9 @@ export default function App() {
   const hasEnclosingFinding = projectFindings.some(f => f.projectId !== selectedProject?.id);
   const filtered = useMemo(() => {
     const term = query.toLocaleLowerCase();
-    return findings.filter(f => (eco === 'all' || f.ecosystem === eco) && (risk === 'all' || effectiveRisk(f, activeProtected) === risk)
+    return findings.filter(f => (eco === 'all' || f.ecosystem === eco) && (risk === 'all' || (risk === 'candidates' ? f.complete && !isProtected(f, activeProtected) : risk === 'incomplete' ? !f.complete && !isProtected(f, activeProtected) : effectiveRisk(f, activeProtected) === risk))
       && (projectFilter === 'all' || (projectFilter === 'global' ? !f.projectId : projectFindingIds.has(f.id)))
-      && `${f.label} ${f.path} ${f.reason} ${f.ecosystem}`.toLocaleLowerCase().includes(term))
+      && `${f.label} ${findingTitle(f)} ${f.path} ${f.reason} ${f.ecosystem}`.toLocaleLowerCase().includes(term))
       .sort((a, b) => sort === 'name' ? a.path.localeCompare(b.path) : sort === 'risk' ? effectiveRisk(a, activeProtected).localeCompare(effectiveRisk(b, activeProtected)) || b.logicalBytes - a.logicalBytes : b.logicalBytes - a.logicalBytes);
   }, [findings, eco, risk, projectFilter, projectFindingIds, query, sort, activeProtected]);
   const bounds = pageBounds(requestedPage, filtered.length);
@@ -160,7 +164,6 @@ export default function App() {
     return () => cancelAnimationFrame(frame);
   }, [current?.id, tab, compactDetails]);
   useEffect(() => { if (selected && !current) setSelected(null); }, [selected, current]);
-  const top = findings.filter(f => !isProtected(f, activeProtected) && f.complete).sort((a, b) => b.logicalBytes - a.logicalBytes).slice(0, 3);
   const projectName = (id: string | null) => report?.projects.find(p => p.id === id)?.name ?? 'Shared / global';
   const hasFilters = !!query || eco !== 'all' || risk !== 'all' || projectFilter !== 'all';
   const clearFilters = () => { setQuery(''); setEco('all'); setRisk('all'); setProjectFilter('all'); };
@@ -171,6 +174,11 @@ export default function App() {
   };
   const returnToFindings = () => { if (previousFindings.current) restoreFindingView(previousFindings.current); previousFindings.current = null; setCanReturnToFindings(false); };
   const inspect = (f: Finding) => { clearFilters(); setSelected(f.id); navigate('findings'); };
+  const inspectSummary = (filter: 'candidates' | 'protected' | 'incomplete' | 'coverage') => {
+    if (filter === 'coverage') { navigate('coverage'); return; }
+    clearFilters(); setRisk(filter); setSelected(null); navigate('findings');
+  };
+  const projectSummary = selectedProject ? summarize(projectFindings, activeProtected) : null;
 
   async function chooseFolders() {
     try {
@@ -230,7 +238,7 @@ export default function App() {
   async function exportReport(extension: 'json' | 'md') {
     if (!report) return;
     setExporting(true); setNotice(''); setError('');
-    const adjusted = { ...report, findings: report.findings.map(f => ({ ...f, userProtected: activeProtected.some(p => pathsOverlap(p, f.path)) })) };
+    const adjusted = { ...report, findings: report.findings.map(f => ({ ...f, label: findingTitle(f), userProtected: activeProtected.some(p => pathsOverlap(p, f.path)) })) };
     const data = redact ? redactedReport(adjusted) : adjusted;
     const content = extension === 'json' ? JSON.stringify({ origin, redacted: redact, report: data }, null, 2) : markdownReport(data, origin, redact);
     try {
@@ -263,11 +271,16 @@ export default function App() {
     {current ? <>
       <div className="section-heading"><span className="eyebrow">FINDING DETAILS</span><button className="icon-button" aria-label="Close finding details" onClick={closeFinding}><Icon name="close"/></button></div>
       <span className={`eco-label eco-${current.ecosystem}`}>{current.ecosystem}</span>
-      <h2 ref={detailTitleRef} tabIndex={-1}>{current.label}</h2><div className="detail-size">{bytes(current.logicalBytes)}</div>
+      <h2 ref={detailTitleRef} tabIndex={-1}>{findingTitle(current)}</h2><div className="detail-size">{bytes(current.logicalBytes)}</div>
       <p className="muted">Logical size · {current.files.toLocaleString()} files{!current.complete ? ' · incomplete measurement' : ''}</p>
       <Badge risk={effectiveRisk(current, activeProtected)}/>
       <div className="path-block">{visiblePath(current.path)}</div>
-      <h3>What this means</h3><p>{current.reason}</p>
+      <section className="next-step" aria-label="Suggested review step"><h3>{isProtected(current, activeProtected) ? 'Keep this location protected' : !current.complete ? 'Resolve incomplete coverage first' : 'What to check first'}</h3><p>{reviewStep(current, activeProtected)}</p>{!current.complete && <button className="text-button" onClick={() => navigate('coverage')}>Review scan coverage →</button>}</section>
+      <div className="detail-actions">
+        <button disabled={!native || !!unavailable || origin === 'demo' || busy} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
+        <ProtectionControls key={current.id} finding={current} findings={findings} paths={activeProtected} setPaths={origin === 'demo' ? setDemoProtected : setProtectedPaths}/>
+      </div>
+      <h3>Why it was identified</h3><p>{current.reason}</p>
       <details key={`evidence-${current.id}`} open={current.evidence.length <= 6}><summary>Evidence, not assumptions ({current.evidence.length})</summary><ul>{current.evidence.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
       {!!current.protectedDescendantCount && <section aria-label="Protected locations">
         <h3>Protected locations</h3>
@@ -278,10 +291,6 @@ export default function App() {
       <h3>Recovery & trade-offs</h3><p>{current.recovery}</p>
       {current.latestModified !== null && <p className="muted">Latest file modification: {new Date(current.latestModified * 1000).toLocaleDateString('en-GB')}. Not a last-use date.</p>}
       <details><summary>Limits of this recommendation</summary><ul>{current.caveats.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
-      <div className="detail-actions">
-        <button disabled={!native || !!unavailable || origin === 'demo' || busy} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
-        <ProtectionControls key={current.id} finding={current} findings={findings} paths={activeProtected} setPaths={origin === 'demo' ? setDemoProtected : setProtectedPaths}/>
-      </div>
       <p className="tiny muted">Protection is a saved review preference, not a filesystem permission. No cleanup commands are available in this pilot.</p>
     </> : !findings.length ? <>
       <h2>No classified findings</h2><p>Files may have been measured without matching a supported developer-storage category. Review scan coverage or choose another workspace.</p>
@@ -297,20 +306,24 @@ export default function App() {
   </aside>;
 
   return <div className={`app-shell ${report ? "report-present" : ""} tab-${tab}`}>
-    <aside className="sidebar">
+    {!inVSCode && <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Icon name="grid"/></span><div>DevSpace<small>ANALYZER</small></div></div>
       <div className="nav-label">WORKSPACE INTELLIGENCE</div>
       <nav aria-label="Main navigation">{([['overview', 'grid', 'Overview'], ['findings', 'list', 'Findings'], ['projects', 'folder', 'Projects'], ['coverage', 'shield', 'Scan coverage']] as const).map(([id, icon, text]) => <button key={id} aria-label={text} className={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => navigate(id)}><Icon name={icon}/><span className="nav-text">{text}</span><span className="nav-tooltip" aria-hidden="true">{text}</span>{id === 'findings' && report && <span className="nav-count">{findings.length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="local-indicator">Local only</div><p>No account. No telemetry.<br/>No automatic cleanup.</p><span className="version">PILOT 0.1.1</span></div>
-    </aside>
+    </aside>}
     <main>
       <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{report ? ({overview:'Overview',findings:'Findings',projects:'Projects',coverage:'Scan coverage'}[tab]) : tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
       {unavailable && <div className="host-unavailable" role="status">{unavailable}</div>}
       {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available in the desktop application or VS Code extension.</div>}
       {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={exitDemo}>Exit demo</button></div>}
       {previousReport && report && <div className="previous-report" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
-      <section className="scope panel" aria-label="Scan configuration">
-        {report ? <div className="scope-top"><div><strong>Next scan</strong><span className="muted">{roots.length} workspace {roots.length === 1 ? 'folder' : 'folders'} · Shared caches {includeCaches ? 'included' : 'excluded'}</span></div><div className="scope-actions"><button aria-expanded={scopeExpanded} aria-controls="scan-settings" onClick={() => setScopeExpanded(value => !value)}>Scan settings</button><button className="primary" disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div></div> : <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || !!unavailable || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>}
+      {report && <div ref={toolbarRef} className="report-toolbar">
+        <div className="report-context"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.projects.length} projects · {report.roots.length} scanned locations</span><small>{reportScope ? `Shared-cache discovery ${reportScope.includeCaches ? 'included' : 'excluded'}` : origin === 'demo' ? 'Demo scope · includes shared caches' : 'Shared-cache scope not recorded'} · {report.progress.files.toLocaleString()} files · {(report.durationMs / 1000).toFixed(1)} s</small></div>
+        <div className="report-actions"><button className={`text-button scan-status status-${scanState}`} onClick={() => navigate('coverage')}>{scanLabel}</button><button aria-expanded={scopeExpanded} aria-controls="scan-settings" onClick={() => setScopeExpanded(value => !value)}>Scan settings</button><button disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button><ExportControls redacted={redact} onRedactedChange={setRedact} exporting={exporting} onExport={exportReport}/></div>
+      </div>}
+      <section className="scope panel" aria-label="Scan configuration" hidden={!!report && !scopeExpanded && !busy && !scopeChanged}>
+        {report ? <div className="scope-top"><div><strong>Next scan settings</strong><span className="muted">Changing these settings does not change the current report.</span></div><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div> : <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || !!unavailable || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>}
         <div id="scan-settings" hidden={!!report && !scopeExpanded}>
         {report && <button onClick={chooseFolders} disabled={!native || !!unavailable || busy}><Icon name="folder"/>Choose folders</button>}
         <div className="root-list">{roots.map(root => <span className="root-chip" key={root} title={root}><Icon name="folder"/><span>{visiblePath(root)}</span><button disabled={busy} aria-label={`Remove ${root}`} onClick={() => setRoots(old => old.filter(p => p !== root))}>×</button></span>)}</div>
@@ -321,26 +334,17 @@ export default function App() {
       </section>
 
       {!report ? <section className="welcome panel"><div className="welcome-icon"><Icon name="scan"/></div><span className="eyebrow">LESS GUESSWORK. MORE CONTEXT.</span><h2>Find the weight in your development workspace.</h2><p>Understand Gradle and Maven storage, Node dependencies and Python environments — with explicit evidence, recovery notes and protected data.</p><div className="welcome-steps"><div><b>01</b><strong>Choose your scope</strong><span>Start with your checked-out repositories and shared caches.</span></div><div><b>02</b><strong>Inspect the findings</strong><span>Compare categories, projects and likely recovery costs.</span></div><div><b>03</b><strong>Make an informed decision</strong><span>Export your analysis. This pilot cannot delete anything.</span></div></div><button onClick={loadDemo} disabled={busy}>Explore demo data<Icon name="arrow"/></button></section> : <>
-        <div ref={toolbarRef} className="report-toolbar"><div className="report-bar"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.progress.files.toLocaleString()} files · {bytes(report.progress.logicalBytes)} measured · {(report.durationMs / 1000).toFixed(1)} s</span><button className={`text-button scan-status status-${scanState}`} onClick={() => navigate('coverage')}>{scanLabel}</button></div><ExportControls redacted={redact} onRedactedChange={setRedact} exporting={exporting} onExport={exportReport}/></div>
-        <section className="metrics" aria-label="Scan summary"><div className="metric panel"><span>Identified developer data</span><strong>{bytes(summary.identified)}</strong><small>{findings.length.toLocaleString()} classified findings</small></div><div className="metric panel accent"><span>Review candidates</span><strong>{bytes(summary.candidates)}</strong><small>Logical size · not guaranteed savings</small></div><div className="metric panel"><span>Protected data</span><strong>{bytes(summary.protected)}</strong><small>Unique data or personal protection</small></div><div className="metric panel"><span>Projects in scope</span><strong>{report.projects.length}</strong><small>{report.roots.length} effective scan roots</small></div></section>
+        {tab === 'overview' && <ResultInsights report={report} protectedPaths={activeProtected} onInspect={inspect} onCoverage={() => navigate('coverage')}/>}
+        <ScanSummary report={report} protectedPaths={activeProtected} onInspect={inspectSummary}/>
+        {tab === 'overview' && <section className="panel chart-panel ecosystem-overview"><div className="section-heading"><h2>Identified data by ecosystem</h2><span className="muted">Select an ecosystem to inspect its findings</span></div><div className="storage-bars" aria-label="Storage by ecosystem">{groups.map(group => <button className={`storage-bar eco-${group.name}`} key={group.name} onClick={() => { clearFilters(); setEco(group.name); setSelected(null); navigate('findings'); }}>
+          <span className="storage-bar-label"><span><i className={`dot eco-${group.name}`}/>{group.name}</span><strong>{bytes(group.value)}</strong></span><span className="storage-track" aria-hidden="true"><span style={{width:`${group.value / Math.max(groups.reduce((sum, g) => sum + g.value, 0), 1) * 100}%`}}/></span>
+        </button>)}{!groups.length && <p>No recognized developer data found in this scope.</p>}</div></section>}
 
-
-        {tab === 'overview' && <>
-          <section className="size-context panel" aria-label="Measurement coverage"><p><strong>{bytes(report.progress.logicalBytes)} measured</strong> · {bytes(summary.identified)} identified · {unclassified === null ? 'Unclassified amount unavailable' : `${bytes(unclassified)} unclassified measured data`}</p><details><summary>How to interpret these sizes</summary><p>Protected data and review candidates are parts of identified data. Unclassified files are outside the recognized categories.{!report.complete && ' Partial scan: these totals cover measured files only; unread data is not estimated.'} Logical size is not physical allocation or guaranteed savings.</p></details></section>
-          <div className="overview-grid"><section className="panel chart-panel"><div className="section-heading"><h2>Where the space is</h2><span className="muted">Classified logical bytes</span></div><div className="storage-bars" aria-label="Storage by ecosystem">{groups.map(group => <button className={`storage-bar eco-${group.name}`} key={group.name} onClick={() => { clearFilters(); setEco(group.name); setSelected(null); setTab('findings'); }}>
-            <span className="storage-bar-label"><span><i className={`dot eco-${group.name}`}/>{group.name}</span><strong>{bytes(group.value)} <small>{(group.value / Math.max(summary.identified,1) * 100).toFixed(1)}%</small></strong></span>
-            <span className="storage-track" aria-hidden="true"><span style={{width:`${group.value / Math.max(summary.identified,1) * 100}%`}}/></span>
-
-          </button>)}{!groups.length && <p>No recognized developer data found in this scope.</p>}</div></section>
-          <section className="panel inspect-panel"><div className="section-heading"><h2>Start your review here</h2><span className="eyebrow">LARGEST FIRST</span></div>{top.length ? top.map((f, i) => <button className="review-item" key={f.id} onClick={() => inspect(f)}><span className="rank">0{i + 1}</span><div><strong>{f.label}</strong><small>{projectName(f.projectId)}</small><Badge risk={effectiveRisk(f, activeProtected)}/></div><b>{bytes(f.logicalBytes)}</b></button>) : <p>No complete, unprotected review candidates in this scan.</p>}<p className="tiny muted">Prioritized by size, not by a claim that deletion is safe.</p></section></div>
-
-        </>}
-
-        {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} onClick={event => { if (!(event.target as HTMLElement).closest("button")) setSelected(f.id); }} className={selected === f.id ? 'selected' : ''}><td><button ref={element => { if (element) findingButtons.current.set(f.id, element); else findingButtons.current.delete(f.id); }} aria-controls="finding-detail-content" className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{compactDetails ? <dialog id="finding-detail-content" ref={drawerRef} className="finding-drawer" aria-label="Finding details" onCancel={event => { event.preventDefault(); closeFinding(); }}>{current && detailPanel}{drawerActive && feedback}</dialog> : detailPanel}</div>}
+        {tab === 'findings' && <div className={`workspace-grid ${current ? 'has-detail' : ''}`}><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{selectedProject && projectSummary && <div className="project-takeaway"><strong>{selectedProject.name}</strong><span>{bytes(projectSummary.candidates)} to review · {bytes(projectSummary.protected)} protected{projectSummary.incomplete > 0 ? ` · ${bytes(projectSummary.incomplete)} incomplete` : ''}</span><small>{hasEnclosingFinding ? 'Includes enclosing protected storage; not this project’s exclusive size.' : 'Identified locations in this project. Select a finding for its review steps.'}</small></div>}{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option><option value="candidates">To review</option><option value="incomplete">Incomplete findings</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} onClick={event => { if (!(event.target as HTMLElement).closest("button")) setSelected(f.id); }} className={selected === f.id ? 'selected' : ''}><td><button ref={element => { if (element) findingButtons.current.set(f.id, element); else findingButtons.current.delete(f.id); }} aria-controls="finding-detail-content" className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{findingTitle(f)}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/><small className="assessment-hint">{reviewLabel(f, activeProtected)}</small></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{compactDetails ? <dialog id="finding-detail-content" ref={drawerRef} className="finding-drawer" aria-label="Finding details" onCancel={event => { event.preventDefault(); closeFinding(); }}>{current && detailPanel}{drawerActive && feedback}</dialog> : detailPanel}</div>}
 
         {tab === 'projects' && <ProjectInventory projects={report.projects} view={projectView} onChange={setProjectView} onInspect={inspectProject}/>}
 
-        {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><span className={`scan-status status-${scanState}`}>{scanLabel}</span></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><WarningBrowser report={report} view={warningView} onChange={setWarningView}/></section></div>}
+        {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><span className={`scan-status status-${scanState}`}>{scanLabel}</span></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><section className="other-files-context" aria-label="Unclassified measured data"><h3>Other measured files · {unclassifiedMeasuredBytes(report) === null ? 'Unknown' : bytes(unclassifiedMeasuredBytes(report)!)}</h3><p>These files were measured but did not match a supported developer-storage category. They may include source files, documents or other data. Their recoverability was not assessed.</p><p>This report does not retain a file-by-file breakdown of this amount. The roots above show the scan boundary; unread or skipped files are outside these totals.</p></section><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><WarningBrowser report={report} view={warningView} onChange={setWarningView}/></section></div>}
 
 
       </>}

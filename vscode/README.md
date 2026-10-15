@@ -16,14 +16,17 @@ The Rust scanner is included in the VSIX. End users do not need Rust, Node, Java
 ## What you get
 
 - Overview, searchable Findings, Projects and Scan coverage in a reusable analysis tab.
-- Native sidebar navigation and explicit workspace/folder scanning.
+- A scan takeaway with concrete review checks, plus a breakdown connecting review candidates, protected data, incomplete findings and other measured files to the total.
+- Native sidebar navigation that follows the active result view, and explicit workspace/folder scanning.
 - Progress and cancellation, with partial results when the scanner can stop gracefully.
 - Evidence, protected locations and local personal protection preferences.
-- JSON/Markdown export through a save dialog; a redacted summary is selected by default. Existing files are never overwritten.
+- JSON/Markdown export from the compact **Export** menu through a save dialog; a redacted summary is selected by default. Existing files are never overwritten.
 - VS Code dark, light and high-contrast colors, keyboard navigation and detail drawers in narrow editor groups.
 - Clearly labelled synthetic demo data. Demo mode restores your real report when you exit it.
 
 Shared caches are **off by default** in the extension. Enable them explicitly in Scan settings when you want a wider scan. Scan roots/cache inclusion are remembered for the workspace; personal protection preferences stay in this VS Code profile. Reports remain in memory until you export them. Closing and reopening the analysis tab keeps the latest native report for this VS Code session; filters return to their initial values when the tab is closed. Switching views or temporarily hiding the tab preserves the active view.
+
+Review suggestions use the scanner's existing categories and recovery evidence. They are ordered by logical size and exclude protected, empty and incompletely measured locations. They do not establish that data can be deleted or how much physical disk space would be recovered. **Other measured files** have no supported category; this version does not retain their individual file sizes or compare scans over time. After a real scan, **Explore demo** is available inside **Scan settings**.
 
 ## Supported environments
 
