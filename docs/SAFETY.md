@@ -46,6 +46,8 @@ All sizes are **logical file lengths**. A hardlinked file encountered at two dif
 
 ## Configuration reads
 
+Gradle settings support bounded, literal top-level `include 'api', ':lib:core'` and `include("api", ":lib:core")` declarations, including intermediate projects. This identifies conventional output for modules whose build rules are in the root project. Comments and strings are lexed without execution. Dynamic declarations produce `gradle-settings` warnings; directory/build-file remapping and applied settings scripts disable inferred paths. Names containing traversal, separators or interpolation are rejected. Only existing in-scope directories are visited, and the normal link and protection checks still apply.
+
 The scanner may read bounded, known configuration files for specific fields: npm user cache/store settings, Maven user `localRepository`, Gradle wrapper `distributionUrl`, Git `HEAD` when `.git` is a directory, and the package.json workspace marker. Raw configuration contents are not copied into reports. Secrets on unrelated lines of a configuration file are not intentionally extracted or displayed.
 
 No source file contents, `.env` values, package scripts, wrapper executables, virtual-disk contents or arbitrary file previews are opened. Most project markers and lockfiles are detected by filename and metadata only. Variable substitution is bounded to avoid cyclic expansion.

@@ -2,6 +2,7 @@ use std::{collections::BTreeSet, fs, path::{Path, PathBuf}, sync::atomic::{Atomi
 use crate::{config::{self, Environment}, model::*, paths::{display, git_marker, is_link, key, normalize, regular, small_text, within}};
 mod rules;
 mod scope;
+mod gradle;
 
 const MAX_ENTRIES: u64 = 5_000_000;
 const MAX_DEPTH: usize = 128;
@@ -126,7 +127,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
             "At most 5 million entries, 20,000 findings, 10,000 projects and 128 directory levels are scanned. At most 500 warning details are retained.".into(),
         ],
     };
-    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![] };
+    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![], gradle_modules: Default::default(), gradle_checked: Default::default() };
     for raw in request.protected_paths {
         match normalize(Path::new(&raw)) {
             Ok(path) => s.protected.push(path),
@@ -161,6 +162,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
 struct Scanner<'a, F: FnMut(Progress)> {
     report: Report, cancelled: &'a AtomicBool, callback: F, start: Instant,
     last_emit: Instant, stopped: bool, protected: Vec<PathBuf>,
+    gradle_modules: std::collections::BTreeMap<String, PathBuf>, gradle_checked: BTreeSet<String>,
 }
 impl<F: FnMut(Progress)> Scanner<'_, F> {
     fn halted(&self) -> bool { self.stopped || self.cancelled.load(Ordering::Relaxed) }
@@ -227,7 +229,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         if !in_git && !name_is_git && git_marker(&path.join(".git")) && !owner.is_some_and(|i| key(Path::new(&self.report.projects[i].path)) == key(path)) {
             guards.insert("Explicit nested Git project inside this aggregate".into());
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return Size::missing(); }
-            if let Some(p) = project(path, self.report.projects.len()) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
+            if let Some(p) = self.project_at(path, self.report.projects.len()) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
         }
         let entries = match fs::read_dir(path) { Ok(e) => e, Err(e) => { self.warn(path, "directory-unavailable", &e.to_string()); return Size::missing(); } };
         let mut total = Size { guards, ..Size::default() };
@@ -268,7 +270,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         if self.excluded(path) { return; }
         self.report.progress.directories += 1;
         let mut next_owner = owner;
-        if let Some(p) = project(path, self.report.projects.len()) {
+        if let Some(p) = self.project_at(path, self.report.projects.len()) {
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return; }
             next_owner = Some(self.report.projects.len()); self.report.projects.push(p);
         }

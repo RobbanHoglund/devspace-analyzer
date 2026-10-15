@@ -36,7 +36,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         self.visit(root, owner, 0, storage);
     }
 
-    fn root_context(&self, root: &Path) -> (Option<Project>, Option<Rule>) {
+    fn root_context(&mut self, root: &Path) -> (Option<Project>, Option<Rule>) {
         let ancestors: Vec<_> = root.ancestors().skip(1).collect();
         let selected_project = project(root, 0).is_some();
         let mut context = None;
@@ -54,10 +54,10 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
                 rule.evidence.push(format!("Storage category inherited from: {}. Only the selected subtree was measured.", display(ancestor)));
                 return (context, Some(rule));
             }
-            if let Some(p) = project(ancestor, 0) { context = Some(p); }
+            if let Some(p) = self.project_at(ancestor, 0) { context = Some(p); }
         }
         // A source project selected in its own right owns its own inventory.
-        if selected_project && self.rule_with_project(root, context.as_ref(), true).is_none() { context = None; }
+        if self.project_at(root, 0).is_some() && self.rule_with_project(root, context.as_ref(), true).is_none() { context = None; }
         (context, None)
     }
 }
