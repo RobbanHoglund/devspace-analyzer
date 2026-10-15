@@ -8,6 +8,7 @@ import { demoReport } from './demo';
 import { pageBounds } from './pagination';
 import { scopeKey, type ScanScope } from './scanScope';
 import { unclassifiedMeasuredBytes } from './measurement';
+import { WarningBrowser, emptyWarningView, type WarningView } from './WarningBrowser';
 import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectInventory';
 import { ProtectionControls } from './ProtectionControls';
 
@@ -42,6 +43,7 @@ export default function App() {
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const detailRef = useRef<HTMLElement>(null);
+  const [warningView, setWarningView] = useState<WarningView>(emptyWarningView);
   const [projectView, setProjectView] = useState<ProjectView>(emptyProjectView);
   const [roots, setRoots] = useState<string[]>(() => readPreference('devspace.roots').slice(0, 32));
   const [protectedPaths, setProtectedPaths] = useState<string[]>(() => readPreference('devspace.protected'));
@@ -79,7 +81,7 @@ export default function App() {
     setQueryValue(view.query); setEcoValue(view.eco); setRiskValue(view.risk);
     setProjectFilterValue(view.projectFilter); setSortValue(view.sort); setPage(view.page); setSelected(view.selected);
   };
-  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; projectView: ProjectView; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean; scroll: Partial<Record<Tab, number>>; previousFindings: FindingView | null } | null>(null);
+  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; projectView: ProjectView; warningView: WarningView; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean; scroll: Partial<Record<Tab, number>>; previousFindings: FindingView | null } | null>(null);
   const activeProtected = origin === 'demo' ? demoProtected : protectedPaths;
 
   useEffect(() => {
@@ -179,7 +181,7 @@ export default function App() {
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
       savedSession.current = null; previousFindings.current = null; setCanReturnToFindings(false); scrollPositions.current = {}; setPage(0);
-      setProjectView(emptyProjectView);
+      setProjectView(emptyProjectView); setWarningView(emptyWarningView);
       setScopeExpanded(false);
       setReportScope({roots: [...roots], includeCaches});
       requestAnimationFrame(() => window.scrollTo({top:0}));
@@ -192,10 +194,10 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
-    if (report && origin === 'native') savedSession.current = { report, reportScope, projectView, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact, scroll: {...scrollPositions.current, [tab]:window.scrollY}, previousFindings:previousFindings.current };
+    if (report && origin === 'native') savedSession.current = { report, reportScope, projectView, warningView, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact, scroll: {...scrollPositions.current, [tab]:window.scrollY}, previousFindings:previousFindings.current };
     setPage(0); setCanReturnToFindings(false); previousFindings.current = null; scrollPositions.current = {};
     requestAnimationFrame(() => window.scrollTo({top:0}));
-    setProjectView(emptyProjectView);
+    setProjectView(emptyProjectView); setWarningView(emptyWarningView);
     setReportScope(null);
     setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
@@ -204,6 +206,7 @@ export default function App() {
     setOrigin('native'); setError(''); setNotice('');
     scrollPositions.current = saved?.scroll ?? {}; previousFindings.current = saved?.previousFindings ?? null; setCanReturnToFindings(!!previousFindings.current);
     requestAnimationFrame(() => window.scrollTo({top:saved?.scroll[saved.tab] ?? 0}));
+    setWarningView(saved?.warningView ?? emptyWarningView);
     setProjectView(saved?.projectView ?? emptyProjectView);
     setReportScope(saved?.reportScope ?? null);
     setReport(saved?.report ?? null); setPreviousReport(saved?.previousReport ?? false);
@@ -320,7 +323,7 @@ export default function App() {
 
         {tab === 'projects' && <ProjectInventory projects={report.projects} view={projectView} onChange={setProjectView} onInspect={inspectProject}/>}
 
-        {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><Badge risk={report.complete ? 'low' : 'review'}/></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><h3>Warnings ({report.warningCount.toLocaleString()})</h3><div className="warning-list">{report.warnings.map((w, i) => <div className="warning-item" key={i}><strong>{w.code}</strong><span className="mono">{visiblePath(w.path)}</span><p>{w.message}</p></div>)}{!report.warnings.length && <p>No skipped-entry warnings were recorded.</p>}</div>{report.warningCount > report.warnings.length && <p>Only the first {report.warnings.length} warning details are retained.</p>}</section></div>}
+        {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><Badge risk={report.complete ? 'low' : 'review'}/></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><WarningBrowser report={report} view={warningView} onChange={setWarningView}/></section></div>}
 
 
       </>}
