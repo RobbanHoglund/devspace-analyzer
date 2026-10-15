@@ -93,22 +93,92 @@ export function redactedReport(report: Report): Report {
   };
 }
 function markdownText(value: string) { return value.replace(/[\\`*_{}\[\]<>#!|]/g, '\\$&').replace(/[\r\n]/g, ' '); }
-export function markdownReport(report: Report, origin: 'native' | 'demo'): string {
-  const rows = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes).map(f => {
+export function markdownReport(report: Report, origin: 'native' | 'demo', redacted = false): string {
+  // Keep this boundary defensive even if the caller already redacted the data.
+  if (redacted) report = redactedReport(report);
+  const findings = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes);
+  const rows = findings.map(f => {
     const risk = f.userProtected ? 'protected' : f.risk;
     const size = `${bytes(f.logicalBytes)}${f.complete ? '' : ' (partial)'}`;
     const candidate = f.complete && risk !== 'protected';
     return `| ${markdownText(f.label)} | ${size} | ${f.complete ? 'Complete' : 'Partial'} | ${risk} | ${candidate ? 'Yes' : 'No'} | ${markdownText(f.path)} |`;
   });
+  const list = (items: string[]) => items.length ? items.map(s => `- ${markdownText(s)}`).join('\n') : '- None recorded.';
+  const projectName = (id: string | null) => report.projects.find(p => p.id === id)?.name ?? 'Shared / global';
+  const detail = redacted ? '' : `
+## Scope
+
+${list(report.roots)}
+
+Only files within these effective roots were measured. Parent project context does not expand the measurement scope.
+
+### Recognized shared caches
+
+${list(report.globalCaches.map(c => `${c.ecosystem} / ${c.kind}: ${c.path} — ${c.source}`))}
+
+## Projects
+
+| Project | Path | Ecosystems | Owned logical size in scope | Identified artifacts | Context |
+|---|---|---|---:|---:|---|
+${report.projects.map(p => `| ${markdownText(p.name)} | ${markdownText(p.path)} | ${markdownText(p.ecosystems.join(', '))} | ${bytes(p.ownedLogicalBytes)} | ${bytes(p.artifactBytes)} | ${p.contextOnly ? 'Parent context; selected scope only' : 'Discovered in scope'} |`).join('\n')}
+
+${report.projects.map(p => `### ${markdownText(p.name)}
+
+Project markers: ${markdownText(p.markers.join(', ') || 'None recorded')}.
+
+Lockfile markers: ${markdownText(p.lockfiles.join(', ') || 'None recognized')}. Reproducibility has not been verified.
+
+Git: ${markdownText(p.gitKind ?? 'No Git marker')}${p.branch ? `; branch ${markdownText(p.branch)}` : ''}. Other branches and working-tree state were not evaluated.
+
+Gradle wrapper: ${markdownText(p.wrapperVersion ?? 'None detected')}. Workspace marker: ${p.workspace ? 'Yes' : 'No'}.
+`).join('\n')}
+
+## Finding analysis
+
+${findings.map((f, i) => `### ${i + 1}. ${markdownText(f.label)}
+
+Path: ${markdownText(f.path)}
+
+Project: ${markdownText(projectName(f.projectId))}
+
+Assessment: ${f.userProtected ? 'protected (personal preference)' : f.risk}. Measurement: ${f.complete ? 'Complete' : 'Partial; measured files only'}.
+
+Category: ${markdownText(f.kind)}. Confidence: ${markdownText(f.confidence)}. Files measured: ${f.files}. Logical size: ${bytes(f.logicalBytes)}.
+
+**What this means**
+
+${markdownText(f.reason)}
+
+**Evidence**
+
+${list(f.evidence)}
+
+**Recovery and trade-offs**
+
+${markdownText(f.recovery)}
+
+**Limits of this recommendation**
+
+${list(f.caveats)}
+${f.wrapperVersion ? `\nGradle wrapper: ${markdownText(f.wrapperVersion)}. Discovered references: ${markdownText(f.wrapperReferences.map(projectName).join(', ') || 'None in this scan; not proof of disuse')}.\n` : ''}
+${f.latestModified !== null ? `\nLatest file modification: ${new Date(f.latestModified * 1000).toISOString()}. Not a last-use date.\n` : ''}
+${f.protectedDescendantCount ? `\n**Protected locations**\n\nShowing ${f.protectedDescendants?.length ?? 0} of ${f.protectedDescendantCount} protected locations; nested locations covered by a protected parent are omitted.\n\n${list((f.protectedDescendants ?? []).map(p => `${p.label}: ${p.path}`))}\n` : ''}`).join('\n')}
+## Coverage warnings
+
+${list(report.warnings.map(w => `${w.code}: ${w.path} — ${w.message}`))}
+${report.warningCount > report.warnings.length ? `\nOnly ${report.warnings.length} of ${report.warningCount} warning details were retained.\n` : ''}
+`;
   return `# DevSpace Analyzer report
 
 Origin: ${origin === 'demo' ? 'DEMO — synthetic data, not this computer' : 'Local native scan'}
+
+Detail level: ${redacted ? 'Redacted summary' : 'Full report'}
 
 Scan: ${new Date(report.startedAt * 1000).toISOString()}
 
 Status: ${report.cancelled ? 'Cancelled; partial results' : report.complete ? 'Completed within scope' : 'Partial coverage; review warnings'}
 
-${report.sizeBasis}
+${markdownText(report.sizeBasis)}
 
 Files measured: ${report.progress.files}
 
@@ -121,6 +191,7 @@ Partial sizes include only the files measured, not unread or skipped entries. In
 | Finding | Logical size | Measurement | Risk | Review candidate | Path |
 |---|---:|---|---|---|---|
 ${rows.join('\n')}
+${detail}
 
 ## Limitations
 

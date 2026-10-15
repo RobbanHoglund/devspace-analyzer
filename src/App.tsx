@@ -132,7 +132,7 @@ export default function App() {
     setExporting(true); setNotice(''); setError('');
     const adjusted = { ...report, findings: report.findings.map(f => ({ ...f, userProtected: activeProtected.some(p => pathsOverlap(p, f.path)) })) };
     const data = redact ? redactedReport(adjusted) : adjusted;
-    const content = extension === 'json' ? JSON.stringify({ origin, redacted: redact, report: data }, null, 2) : markdownReport(data, origin);
+    const content = extension === 'json' ? JSON.stringify({ origin, redacted: redact, report: data }, null, 2) : markdownReport(data, origin, redact);
     try {
       if (native) {
         const saved = await invoke<string | null>('save_export', { content, extension });

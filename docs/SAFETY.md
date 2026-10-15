@@ -56,6 +56,8 @@ No source file contents, `.env` values, package scripts, wrapper executables, vi
 
 ## Report privacy
 
+Full Markdown exports include scope, project ownership in scope, per-finding reasons/evidence/recovery/caveats, retained protected locations, wrapper context and coverage-warning details. The default redacted Markdown remains a restricted summary and applies redaction at the formatting boundary as well as in the UI. Partial measurements and effective personal protection remain explicit in both formats.
+
 A previous report remains inspectable and exportable while a new scan runs or fails, with an explicit previous-report notice. Its native/demo provenance is preserved. Successful scans, including cancelled scans with partial results, replace it. Folder reveal is disabled during scanning to avoid mixing finding IDs between native reports.
 
 Full reports contain absolute paths, project names, branch names, timestamps and configuration-location provenance. Those can reveal usernames, customer names or internal project details. Treat a full export as potentially sensitive.

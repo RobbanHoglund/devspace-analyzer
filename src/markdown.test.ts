@@ -38,3 +38,46 @@ describe('Markdown measurement status', () => {
     expect(md).not.toContain('Developer');
   });
 });
+
+describe('full Markdown analysis', () => {
+  it('retains the reasoning, evidence, recovery, project context, protected paths and warnings', () => {
+    const report = demoReport();
+    report.projects[0].contextOnly = true;
+    report.findings[0].protectedDescendants = [{ path: 'C:/private-boundary', label: 'Protected storage' }];
+    report.findings[0].protectedDescendantCount = 25;
+    const md = markdownReport(report, 'native');
+    expect(md).toContain('Detail level: Full report');
+    expect(md).toContain(report.findings[0].reason);
+    expect(md).toContain(report.findings[0].evidence[0]);
+    expect(md).toContain(report.findings[0].recovery);
+    expect(md).toContain(report.findings[0].caveats[0]);
+    expect(md).toContain('Parent context; selected scope only');
+    expect(md).toContain('Showing 1 of 25 protected locations');
+    expect(md).toContain('C:/private-boundary');
+    expect(md).toContain('link-skipped');
+  });
+  it('keeps the redacted summary private even when handed an unredacted report', () => {
+    const report = demoReport();
+    report.findings[0].protectedDescendants = [{ path: 'C:/PRIVATE_PATH', label: 'PRIVATE_LABEL' }];
+    report.findings[0].reason = 'PRIVATE_REASON';
+    report.findings[0].recovery = 'PRIVATE_RECOVERY';
+    const md = markdownReport(report, 'native', true);
+    expect(md).toContain('Detail level: Redacted summary');
+    expect(md).not.toContain('PRIVATE_');
+    expect(md).not.toContain('Developer');
+    expect(md).not.toContain('Finding analysis');
+  });
+  it('escapes Markdown in all newly exported free-text fields', () => {
+    const report = demoReport();
+    report.findings[0].reason = '# Heading\n![image](https://example.test) | cell';
+    report.findings[0].evidence = ['[link](target)'];
+    report.findings[0].recovery = '<script>content</script>';
+    report.findings[0].protectedDescendants = [{ path: '/private|path', label: '*label*' }];
+    report.findings[0].protectedDescendantCount = 1;
+    const md = markdownReport(report, 'native');
+    expect(md).toContain('\\# Heading \\!\\[image\\](https://example.test) \\| cell');
+    expect(md).toContain('\\[link\\](target)');
+    expect(md).toContain('\\<script\\>content\\</script\\>');
+    expect(md).toContain('\\*label\\*: /private\\|path');
+  });
+});
