@@ -6,6 +6,7 @@ import type { Finding, Progress, Report, Risk } from './types';
 import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, pathsOverlap, redactedReport, summarize, treemap, visiblePath } from './analysis';
 import { demoReport } from './demo';
 import { pageBounds } from './pagination';
+import { scopeKey, type ScanScope } from './scanScope';
 import { ProtectionControls } from './ProtectionControls';
 
 type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
@@ -37,6 +38,7 @@ export default function App() {
   const [includeCaches, setIncludeCaches] = useState(true);
   const [manualRoot, setManualRoot] = useState('');
   const [report, setReport] = useState<Report | null>(null);
+  const [reportScope, setReportScope] = useState<ScanScope | null>(null);
   const [previousReport, setPreviousReport] = useState(false);
   const [origin, setOrigin] = useState<'native' | 'demo'>('native');
   const [tab, setTab] = useState<Tab>('overview');
@@ -54,7 +56,7 @@ export default function App() {
   const [selected, setSelected] = useState<string | null>(null);
   const [redact, setRedact] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const savedSession = useRef<{ report: Report; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean } | null>(null);
+  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean } | null>(null);
   const activeProtected = origin === 'demo' ? demoProtected : protectedPaths;
 
   useEffect(() => {
@@ -69,6 +71,7 @@ export default function App() {
   }, [roots, protectedPaths]);
   useEffect(() => { setPage(0); }, [query, eco, risk, projectFilter, sort, tab, report]);
 
+  const scopeChanged = origin === 'native' && !!reportScope && scopeKey(reportScope) !== scopeKey({roots, includeCaches});
   const findings = report?.findings ?? [];
   const summary = useMemo(() => summarize(findings, activeProtected), [findings, activeProtected]);
   const groups = useMemo(() => {
@@ -115,6 +118,7 @@ export default function App() {
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
       savedSession.current = null;
+      setReportScope({roots: [...roots], includeCaches});
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); setCancelling(false); }
@@ -124,12 +128,14 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
-    if (report && origin === 'native') savedSession.current = { report, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact };
+    if (report && origin === 'native') savedSession.current = { report, reportScope, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact };
+    setReportScope(null);
     setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
   function exitDemo() {
     const saved = savedSession.current; savedSession.current = null;
     setOrigin('native'); setError(''); setNotice('');
+    setReportScope(saved?.reportScope ?? null);
     setReport(saved?.report ?? null); setPreviousReport(saved?.previousReport ?? false);
     setTab(saved?.tab ?? 'overview'); setQuery(saved?.query ?? ''); setEco(saved?.eco ?? 'all');
     setRisk(saved?.risk ?? 'all'); setProjectFilter(saved?.projectFilter ?? 'all');
@@ -211,6 +217,7 @@ export default function App() {
         <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>
         <div className="root-list">{roots.map(root => <span className="root-chip" key={root} title={root}><Icon name="folder"/><span>{visiblePath(root)}</span><button disabled={busy} aria-label={`Remove ${root}`} onClick={() => setRoots(old => old.filter(p => p !== root))}>×</button></span>)}</div>
         <div className="scope-options"><form onSubmit={e => { e.preventDefault(); addManual(); }}><input aria-label="Add folder path" value={manualRoot} onChange={e => setManualRoot(e.target.value)} placeholder="Or enter a folder path, e.g. C:\\Workspaces" disabled={busy}/><button disabled={busy || !manualRoot.trim()} type="submit">Add</button></form><label><input type="checkbox" checked={includeCaches} disabled={busy} onChange={e => setIncludeCaches(e.target.checked)}/>Include known shared caches</label><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div>
+        {scopeChanged && <p className="scope-change" role="status">Settings changed — scan again to update results. The current report still describes its original scope.</p>}
         {busy && <div className="scan-progress" role="status"><div className="progress-track"><span/></div><div><strong>{cancelling ? 'Cancelling at the next filesystem boundary…' : `Scanning · ${progress.files.toLocaleString()} files · ${bytes(progress.logicalBytes)}`}</strong><button onClick={cancel} disabled={cancelling}>Cancel scan</button></div><span className="mono muted">{visiblePath(progress.currentPath)}</span></div>}
       </section>
 
