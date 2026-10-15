@@ -54,6 +54,8 @@ No source file contents, `.env` values, package scripts, wrapper executables, vi
 
 ## Report privacy
 
+A previous report remains inspectable and exportable while a new scan runs or fails, with an explicit previous-report notice. Its native/demo provenance is preserved. Successful scans, including cancelled scans with partial results, replace it. Folder reveal is disabled during scanning to avoid mixing finding IDs between native reports.
+
 Full reports contain absolute paths, project names, branch names, timestamps and configuration-location provenance. Those can reveal usernames, customer names or internal project details. Treat a full export as potentially sensitive.
 
 The default redacted export is a deliberately restricted summary. It replaces paths, names, branch/version text, raw evidence, warning text and other free-form content with fixed descriptions and anonymous identifiers. Counts, sizes, category labels and timestamps remain. It is not a claim that all statistical information is anonymous in every context.

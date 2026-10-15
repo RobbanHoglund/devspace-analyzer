@@ -37,6 +37,7 @@ export default function App() {
   const [includeCaches, setIncludeCaches] = useState(true);
   const [manualRoot, setManualRoot] = useState('');
   const [report, setReport] = useState<Report | null>(null);
+  const [previousReport, setPreviousReport] = useState(false);
   const [origin, setOrigin] = useState<'native' | 'demo'>('native');
   const [tab, setTab] = useState<Tab>('overview');
   const [busy, setBusy] = useState(false);
@@ -108,10 +109,10 @@ export default function App() {
   }
   async function startScan() {
     if (!native || busy) return;
-    setBusy(true); setCancelling(false); setReport(null); setOrigin('native'); setProgress(zero); setSelected(null); setError(''); setNotice(''); clearFilters();
+    setBusy(true); setCancelling(false); setPreviousReport(!!report); setProgress(zero); setError(''); setNotice('');
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
-      setReport(result); setTab('overview');
+      setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); setCancelling(false); }
   }
@@ -120,9 +121,10 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
-    setReport(demoReport()); setOrigin('demo'); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
+    setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
   async function reveal(f: Finding) {
+    if (busy) return;
     try { await invoke('reveal_finding', { id: f.id }); } catch (e) { setError(String(e)); }
   }
   async function exportReport(extension: 'json' | 'md') {
@@ -159,7 +161,7 @@ export default function App() {
       {current.latestModified !== null && <p className="muted">Latest file modification: {new Date(current.latestModified * 1000).toLocaleDateString('en-GB')}. Not a last-use date.</p>}
       <details><summary>Limits of this recommendation</summary><ul>{current.caveats.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
       <div className="detail-actions">
-        <button disabled={!native || origin === 'demo'} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
+        <button disabled={!native || origin === 'demo' || busy} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
         <ProtectionControls key={current.id} finding={current} findings={findings} paths={activeProtected} setPaths={origin === 'demo' ? setDemoProtected : setProtectedPaths}/>
       </div>
       <p className="tiny muted">Protection is a saved review preference, not a filesystem permission. No cleanup commands are available in this pilot.</p>
@@ -183,7 +185,8 @@ export default function App() {
     <main>
       <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
       {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available only in the desktop application.</div>}
-      {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button onClick={() => { setReport(null); setOrigin('native'); setSelected(null); }}>Exit demo</button></div>}
+      {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={() => { setReport(null); setOrigin('native'); setPreviousReport(false); setSelected(null); }}>Exit demo</button></div>}
+      {previousReport && report && <div className="notice-banner" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
       {error && <div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
       {notice && <div className="notice-banner" role="status">{notice}</div>}
       <section className="scope panel" aria-label="Scan configuration">
