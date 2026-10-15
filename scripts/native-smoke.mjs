@@ -87,6 +87,7 @@ try {
   await expect(page.locator('.project-context')).toContainText('inside protected storage');
   await expect(page.locator('tbody tr')).toContainText('Protected');
   await page.getByRole('button', { name: 'Findings', exact: false }).first().click();
+  await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
   await expect(page.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
   await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeEnabled();

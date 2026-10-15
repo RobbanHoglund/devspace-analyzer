@@ -10,6 +10,7 @@ import { scopeKey, type ScanScope } from './scanScope';
 import { ProtectionControls } from './ProtectionControls';
 
 type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
+type FindingView = {query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null};
 const labels: Record<Risk, string> = { low: 'Lower risk', review: 'Needs review', protected: 'Protected' };
 const native = isTauri();
 const zero: Progress = { files: 0, directories: 0, logicalBytes: 0, projects: 0, currentPath: '' };
@@ -48,16 +49,28 @@ export default function App() {
   const [progress, setProgress] = useState<Progress>(zero);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [query, setQuery] = useState('');
-  const [eco, setEco] = useState('all');
-  const [risk, setRisk] = useState('all');
-  const [projectFilter, setProjectFilter] = useState('all');
-  const [sort, setSort] = useState('size');
+  const [query, setQueryValue] = useState('');
+  const [eco, setEcoValue] = useState('all');
+  const [risk, setRiskValue] = useState('all');
+  const [projectFilter, setProjectFilterValue] = useState('all');
+  const [sort, setSortValue] = useState('size');
   const [requestedPage, setPage] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [redact, setRedact] = useState(true);
   const [exporting, setExporting] = useState(false);
-  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean } | null>(null);
+  const scrollPositions = useRef<Partial<Record<Tab, number>>>({});
+  const previousFindings = useRef<FindingView | null>(null);
+  const [canReturnToFindings, setCanReturnToFindings] = useState(false);
+  const setQuery = (value: string) => { setQueryValue(value); setPage(0); };
+  const setEco = (value: string) => { setEcoValue(value); setPage(0); };
+  const setRisk = (value: string) => { setRiskValue(value); setPage(0); };
+  const setProjectFilter = (value: string) => { setProjectFilterValue(value); setPage(0); };
+  const setSort = (value: string) => { setSortValue(value); setPage(0); };
+  const restoreFindingView = (view: FindingView) => {
+    setQueryValue(view.query); setEcoValue(view.eco); setRiskValue(view.risk);
+    setProjectFilterValue(view.projectFilter); setSortValue(view.sort); setPage(view.page); setSelected(view.selected);
+  };
+  const savedSession = useRef<{ report: Report; reportScope: ScanScope | null; previousReport: boolean; tab: Tab; query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null; redact: boolean; scroll: Partial<Record<Tab, number>>; previousFindings: FindingView | null } | null>(null);
   const activeProtected = origin === 'demo' ? demoProtected : protectedPaths;
 
   useEffect(() => {
@@ -70,7 +83,10 @@ export default function App() {
     try { localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths)); }
     catch { setError('Preferences could not be saved. This session still works, but choices will not survive a restart.'); }
   }, [roots, protectedPaths]);
-  useEffect(() => { setPage(0); }, [query, eco, risk, projectFilter, sort, tab, report]);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => window.scrollTo({top: scrollPositions.current[tab] ?? 0}));
+    return () => cancelAnimationFrame(frame);
+  }, [tab]);
 
   const scopeChanged = origin === 'native' && !!reportScope && scopeKey(reportScope) !== scopeKey({roots, includeCaches});
   const findings = report?.findings ?? [];
@@ -100,8 +116,13 @@ export default function App() {
   const projectName = (id: string | null) => report?.projects.find(p => p.id === id)?.name ?? 'Shared / global';
   const hasFilters = !!query || eco !== 'all' || risk !== 'all' || projectFilter !== 'all';
   const clearFilters = () => { setQuery(''); setEco('all'); setRisk('all'); setProjectFilter('all'); };
-  const navigate = (next: Tab) => { setTab(next); clearFilters(); setSelected(null); };
-  const inspect = (f: Finding) => { setSelected(f.id); setTab('findings'); };
+  const navigate = (next: Tab) => { scrollPositions.current[tab] = window.scrollY; setTab(next); };
+  const inspectProject = (id: string) => {
+    previousFindings.current = {query, eco, risk, projectFilter, sort, page, selected}; setCanReturnToFindings(true);
+    clearFilters(); setProjectFilter(id); setSelected(null); navigate('findings');
+  };
+  const returnToFindings = () => { if (previousFindings.current) restoreFindingView(previousFindings.current); previousFindings.current = null; setCanReturnToFindings(false); };
+  const inspect = (f: Finding) => { clearFilters(); setSelected(f.id); navigate('findings'); };
 
   async function chooseFolders() {
     try {
@@ -119,8 +140,9 @@ export default function App() {
     setBusy(true); setCancelling(false); setPreviousReport(!!report); setProgress(zero); setError(''); setNotice('');
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
-      savedSession.current = null;
+      savedSession.current = null; previousFindings.current = null; setCanReturnToFindings(false); scrollPositions.current = {}; setPage(0);
       setReportScope({roots: [...roots], includeCaches});
+      requestAnimationFrame(() => window.scrollTo({top:0}));
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
     finally { setBusy(false); setCancelling(false); }
@@ -130,18 +152,21 @@ export default function App() {
     try { await invoke('cancel_scan'); } catch (e) { setError(String(e)); setCancelling(false); }
   }
   function loadDemo() {
-    if (report && origin === 'native') savedSession.current = { report, reportScope, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact };
+    if (report && origin === 'native') savedSession.current = { report, reportScope, previousReport, tab, query, eco, risk, projectFilter, sort, page, selected, redact, scroll: {...scrollPositions.current, [tab]:window.scrollY}, previousFindings:previousFindings.current };
+    setPage(0); setCanReturnToFindings(false); previousFindings.current = null; scrollPositions.current = {};
+    requestAnimationFrame(() => window.scrollTo({top:0}));
     setReportScope(null);
     setReport(demoReport()); setOrigin('demo'); setPreviousReport(false); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
   function exitDemo() {
     const saved = savedSession.current; savedSession.current = null;
     setOrigin('native'); setError(''); setNotice('');
+    scrollPositions.current = saved?.scroll ?? {}; previousFindings.current = saved?.previousFindings ?? null; setCanReturnToFindings(!!previousFindings.current);
+    requestAnimationFrame(() => window.scrollTo({top:saved?.scroll[saved.tab] ?? 0}));
     setReportScope(saved?.reportScope ?? null);
     setReport(saved?.report ?? null); setPreviousReport(saved?.previousReport ?? false);
-    setTab(saved?.tab ?? 'overview'); setQuery(saved?.query ?? ''); setEco(saved?.eco ?? 'all');
-    setRisk(saved?.risk ?? 'all'); setProjectFilter(saved?.projectFilter ?? 'all');
-    setSort(saved?.sort ?? 'size'); setPage(saved?.page ?? 0); setSelected(saved?.selected ?? null);
+    setTab(saved?.tab ?? 'overview');
+    restoreFindingView(saved ?? {query:'',eco:'all',risk:'all',projectFilter:'all',sort:'size',page:0,selected:null});
     setRedact(saved?.redact ?? true);
   }
   async function reveal(f: Finding) {
@@ -234,9 +259,9 @@ export default function App() {
           <section className="panel ecosystem-strip">{groups.map(group => <button key={group.name} onClick={() => { clearFilters(); setEco(group.name); setTab('findings'); }}><span className={`eco-label eco-${group.name}`}>{group.name}</span><strong>{bytes(group.value)}</strong><small>{findings.filter(f => f.ecosystem === group.name).length} findings<Icon name="arrow"/></small></button>)}</section>
         </>}
 
-        {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} className={selected === f.id ? 'selected' : ''}><td><button className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{detailPanel}</div>}
+        {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} className={selected === f.id ? 'selected' : ''}><td><button className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{detailPanel}</div>}
 
-        {tab === 'projects' && <section className="panel projects-panel"><div className="section-heading"><h2>Project inventory</h2><span className="muted">Owned bytes exclude nested projects</span></div><p className="muted">Manifests and Git markers are detected statically. The working tree and other branches are not evaluated.</p><div className="table-scroll"><table><thead><tr><th>Project / path</th><th>Build context</th><th>Dependency evidence</th><th className="number">Owned logical size</th><th></th></tr></thead><tbody>{report.projects.slice().sort((a, b) => b.ownedLogicalBytes - a.ownedLogicalBytes).map(p => <tr key={p.id}><td><strong>{p.name}</strong><small className="mono wrap">{visiblePath(p.path)}</small><small>{p.gitKind ?? 'No Git marker'}{p.branch ? ` · ${p.branch}` : ''}{p.workspace ? ' · workspace' : ''}</small></td><td><div className="tags">{p.ecosystems.map(e => <span key={e} className={`eco-label eco-${e}`}>{e}</span>)}</div>{p.wrapperVersion && <small>Gradle wrapper {p.wrapperVersion}</small>}</td><td>{p.lockfiles.length ? <><strong>{p.lockfiles.length} lockfile marker(s)</strong><small>{p.lockfiles.join(', ')}</small></> : <span className="muted">No recognized lockfile</span>}<small>Reproducibility not verified</small></td><td className="number"><strong>{bytes(p.ownedLogicalBytes)}</strong><small>{bytes(p.artifactBytes)} identified artifacts</small>{p.contextOnly && <small>Context from parent · sizes within selected scope only</small>}</td><td><button onClick={() => { clearFilters(); setProjectFilter(p.id); setTab('findings'); }}>Inspect<Icon name="arrow"/></button></td></tr>)}</tbody></table></div>{!report.projects.length && <div className="empty-results">No project markers found. Shared-cache-only scans may have no projects.</div>}</section>}
+        {tab === 'projects' && <section className="panel projects-panel"><div className="section-heading"><h2>Project inventory</h2><span className="muted">Owned bytes exclude nested projects</span></div><p className="muted">Manifests and Git markers are detected statically. The working tree and other branches are not evaluated.</p><div className="table-scroll"><table><thead><tr><th>Project / path</th><th>Build context</th><th>Dependency evidence</th><th className="number">Owned logical size</th><th></th></tr></thead><tbody>{report.projects.slice().sort((a, b) => b.ownedLogicalBytes - a.ownedLogicalBytes).map(p => <tr key={p.id}><td><strong>{p.name}</strong><small className="mono wrap">{visiblePath(p.path)}</small><small>{p.gitKind ?? 'No Git marker'}{p.branch ? ` · ${p.branch}` : ''}{p.workspace ? ' · workspace' : ''}</small></td><td><div className="tags">{p.ecosystems.map(e => <span key={e} className={`eco-label eco-${e}`}>{e}</span>)}</div>{p.wrapperVersion && <small>Gradle wrapper {p.wrapperVersion}</small>}</td><td>{p.lockfiles.length ? <><strong>{p.lockfiles.length} lockfile marker(s)</strong><small>{p.lockfiles.join(', ')}</small></> : <span className="muted">No recognized lockfile</span>}<small>Reproducibility not verified</small></td><td className="number"><strong>{bytes(p.ownedLogicalBytes)}</strong><small>{bytes(p.artifactBytes)} identified artifacts</small>{p.contextOnly && <small>Context from parent · sizes within selected scope only</small>}</td><td><button onClick={() => inspectProject(p.id)}>Inspect<Icon name="arrow"/></button></td></tr>)}</tbody></table></div>{!report.projects.length && <div className="empty-results">No project markers found. Shared-cache-only scans may have no projects.</div>}</section>}
 
         {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><Badge risk={report.complete ? 'low' : 'review'}/></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><h3>Warnings ({report.warningCount.toLocaleString()})</h3><div className="warning-list">{report.warnings.map((w, i) => <div className="warning-item" key={i}><strong>{w.code}</strong><span className="mono">{visiblePath(w.path)}</span><p>{w.message}</p></div>)}{!report.warnings.length && <p>No skipped-entry warnings were recorded.</p>}</div>{report.warningCount > report.warnings.length && <p>Only the first {report.warnings.length} warning details are retained.</p>}</section></div>}
 
