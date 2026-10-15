@@ -12,6 +12,8 @@ Operating-system access timestamps and external software can still change while 
 
 ## Classification is conservative
 
+Protected aggregate findings retain up to 20 sorted protected-location paths and a total boundary count, exposed in finding details and full JSON reports. Nested locations already covered by a protected parent are omitted from this list. The aggregate is still counted once. Redacted reports withhold these paths and labels while retaining the count.
+
 There are three assessments:
 
 - **Lower risk:** stronger, narrow recovery evidence. Currently used only for recognized CPython tagged bytecode filenames where each observed `.pyc` has its exact corresponding source filename and no unrelated entry was found. Dotted source stems are preserved, including optional optimization tags. Unknown, legacy or malformed cache names remain protected. This is not an unconditional deletion approval.

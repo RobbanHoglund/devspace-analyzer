@@ -82,7 +82,8 @@ export function redactedReport(report: Report): Report {
       risk: ['low', 'review', 'protected'].includes(f.risk) ? f.risk : 'protected', confidence: 'See local report',
       logicalBytes: f.logicalBytes, files: f.files, latestModified: f.latestModified, projectId: f.projectId ? projects.get(f.projectId) ?? null : null,
       evidence: ['Detailed evidence withheld from the redacted summary.'], reason: 'Inspect the local application for the category-specific analysis.', recovery: 'Review the local recovery notes before considering changes.', caveats: ['No guaranteed physical-space saving is claimed.'],
-      complete: f.complete, userProtected: f.userProtected, wrapperVersion: null, wrapperReferences: f.wrapperReferences.map(id => projects.get(id)).filter((id): id is string => !!id)
+      complete: f.complete, userProtected: f.userProtected, wrapperVersion: null, wrapperReferences: f.wrapperReferences.map(id => projects.get(id)).filter((id): id is string => !!id),
+      protectedDescendants: [], protectedDescendantCount: f.protectedDescendantCount ?? 0,
     })),
     progress: { ...report.progress, currentPath: '[withheld]' },
     warnings: report.warnings.map((_, i) => ({ path: `[warning-${i + 1}]`, code: 'withheld', message: 'Inspect this warning in the local application.' })),

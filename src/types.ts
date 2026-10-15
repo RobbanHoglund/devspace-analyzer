@@ -5,6 +5,7 @@ export interface Finding {
   logicalBytes: number; files: number; latestModified: number | null; projectId: string | null;
   evidence: string[]; reason: string; recovery: string; caveats: string[]; complete: boolean;
   userProtected: boolean; wrapperVersion: string | null; wrapperReferences: string[];
+  protectedDescendants?: { path: string; label: string }[]; protectedDescendantCount?: number;
 }
 export interface Project {
   id: string; name: string; path: string; ecosystems: string[]; markers: string[]; lockfiles: string[];

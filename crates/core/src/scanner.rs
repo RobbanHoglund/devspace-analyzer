@@ -8,6 +8,7 @@ const MAX_ENTRIES: u64 = 5_000_000;
 const MAX_DEPTH: usize = 128;
 const MAX_FINDINGS: usize = 20_000;
 const MAX_PROJECTS: usize = 10_000;
+const MAX_PROTECTED_LOCATIONS: usize = 20;
 const MARKERS: &[&str] = &["settings.gradle", "settings.gradle.kts", "build.gradle", "build.gradle.kts", "pom.xml", "package.json", "pyproject.toml", "requirements.txt", "Pipfile", "setup.py", "setup.cfg"];
 const LOCKS: &[&str] = &["package-lock.json", "npm-shrinkwrap.json", "pnpm-lock.yaml", "yarn.lock", "poetry.lock", "uv.lock", "Pipfile.lock", "gradle.lockfile"];
 fn now() -> u64 { SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs() }
@@ -17,12 +18,20 @@ struct Size {
     bytes: u64, files: u64, modified: Option<u64>, incomplete: bool,
     // Distinct fixed rule labels, not an unbounded list of every sensitive path.
     guards: BTreeSet<String>,
+    protected_paths: std::collections::BTreeMap<String, String>, protected_path_count: u64,
 }
 impl Size {
     fn add(&mut self, other: Size) {
         self.bytes = self.bytes.saturating_add(other.bytes); self.files += other.files;
         self.modified = self.modified.max(other.modified); self.incomplete |= other.incomplete;
         self.guards.extend(other.guards);
+        self.protected_path_count += other.protected_path_count;
+        self.protected_paths.extend(other.protected_paths);
+        while self.protected_paths.len() > MAX_PROTECTED_LOCATIONS { self.protected_paths.pop_last(); }
+    }
+    fn protect(&mut self, path: &Path, label: &str) {
+        self.protected_path_count += 1;
+        self.protected_paths.insert(display(path), label.into());
     }
     fn missing() -> Self { Self { incomplete: true, ..Self::default() } }
 }
@@ -208,35 +217,40 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
     }
     /// A single traversal measures an aggregate AND checks its safety boundaries.
     /// No child findings are added, so summing findings cannot double-count bytes.
-    fn measure(&mut self, path: &Path, depth: usize, owner: Option<usize>, aggregate: &Aggregate, in_git: bool) -> Size {
+    fn measure(&mut self, path: &Path, depth: usize, owner: Option<usize>, aggregate: &Aggregate, in_git: bool, protected_parent: bool) -> Size {
         let Some(meta) = self.metadata(path, depth) else { return Size::missing(); };
-        let mut guards = BTreeSet::new();
+        let mut boundary = Size::default();
         let name_is_git = path.file_name().is_some_and(|n| n.eq_ignore_ascii_case(".git"));
         if meta.is_dir() || name_is_git || path.extension().is_some_and(|e| e.eq_ignore_ascii_case("vhdx")) {
             if let Some(rule) = self.rule(path, owner, meta.is_dir()) {
-                if rule.risk == "protected" && path != aggregate.root { guards.insert(format!("Protected descendant category: {}", rule.label)); }
+                if rule.risk == "protected" && path != aggregate.root {
+                    boundary.guards.insert(format!("Protected descendant category: {}", rule.label));
+                    if !protected_parent { boundary.protect(path, &rule.label); }
+                }
             }
         }
         if meta.is_file() {
             let mut size = self.file_size(&meta);
             self.charge(owner, size.bytes, owner == aggregate.owner && aggregate.artifact);
-            size.guards = guards; return size;
+            size.add(boundary); return size;
         }
         if !meta.is_dir() { self.warn(path, "special-file", "Special filesystem entry was not opened."); return Size::missing(); }
         if self.excluded(path) { return Size::missing(); }
         self.report.progress.directories += 1;
         let mut next_owner = owner;
         if !in_git && !name_is_git && git_marker(&path.join(".git")) && !owner.is_some_and(|i| key(Path::new(&self.report.projects[i].path)) == key(path)) {
-            guards.insert("Explicit nested Git project inside this aggregate".into());
+            boundary.guards.insert("Explicit nested Git project inside this aggregate".into());
+            if !protected_parent && boundary.protected_path_count == 0 { boundary.protect(path, "Nested Git project"); }
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return Size::missing(); }
             if let Some(p) = self.project_at(path, self.report.projects.len()) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
         }
         let entries = match fs::read_dir(path) { Ok(e) => e, Err(e) => { self.warn(path, "directory-unavailable", &e.to_string()); return Size::missing(); } };
-        let mut total = Size { guards, ..Size::default() };
+        let guarded = protected_parent || boundary.protected_path_count > 0;
+        let mut total = boundary;
         for entry in entries {
             if self.halted() { total.incomplete = true; break; }
             match entry {
-                Ok(e) => total.add(self.measure(&e.path(), depth + 1, next_owner, aggregate, in_git || name_is_git)),
+                Ok(e) => total.add(self.measure(&e.path(), depth + 1, next_owner, aggregate, in_git || name_is_git, guarded)),
                 Err(e) => { self.warn(path, "entry-unavailable", &e.to_string()); total.incomplete = true; }
             }
         }
@@ -247,7 +261,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         if let Some(mut rule) = context.or_else(|| self.rule(path, owner, meta.is_dir())) {
             if self.report.findings.len() >= MAX_FINDINGS { self.warn(path, "finding-limit", "Finding limit reached. Scan narrower roots."); self.stopped = true; return; }
             let aggregate = Aggregate { root: path.to_path_buf(), owner, artifact: rule.kind != "git-metadata" };
-            let size = self.measure(path, depth, owner, &aggregate, false);
+            let size = self.measure(path, depth, owner, &aggregate, false, rule.risk == "protected");
             if !size.guards.is_empty() {
                 rule.risk = "protected".into();
                 rule.reason = format!("Protected content was found inside this directory. The entire aggregate is excluded from review candidates. Original category: {}.", rule.label);
@@ -262,6 +276,8 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
                 evidence: rule.evidence, reason: rule.reason, recovery: rule.recovery,
                 caveats: vec!["Review contents and close tools before considering any cleanup. Nothing is deleted by this application.".into(), "Tracked files, local modifications and remote availability have not been checked.".into(), "Logical bytes are not guaranteed space savings; links and sparse files can change the result.".into()],
                 complete: !size.incomplete, user_protected: protected, wrapper_version: rule.wrapper_version, wrapper_references: vec![],
+                protected_descendants: size.protected_paths.into_iter().map(|(path, label)| ProtectedLocation { path, label }).collect(),
+                protected_descendant_count: size.protected_path_count,
             });
             return;
         }

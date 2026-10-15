@@ -156,6 +156,11 @@ export default function App() {
       <div className="path-block">{visiblePath(current.path)}</div>
       <h3>What this means</h3><p>{current.reason}</p>
       <h3>Evidence, not assumptions</h3><ul>{current.evidence.map((s, i) => <li key={i}>{s}</li>)}</ul>
+      {!!current.protectedDescendantCount && <section aria-label="Protected locations">
+        <h3>Protected locations</h3>
+        <p>Showing {current.protectedDescendants?.length ?? 0} of {current.protectedDescendantCount} protected locations. Nested locations covered by a protected parent are omitted.</p>
+        <ul>{current.protectedDescendants?.map(location => <li key={location.path}><strong>{location.label}</strong><div className="path-block">{visiblePath(location.path)}</div></li>)}</ul>
+      </section>}
       {current.wrapperVersion && <div className="note"><strong>Gradle {current.wrapperVersion}</strong><p>{current.wrapperReferences.length ? `Found in: ${current.wrapperReferences.map(projectName).join(', ')}` : 'No matching wrapper in this scan. This does not mean unused.'}</p></div>}
       <h3>Recovery & trade-offs</h3><p>{current.recovery}</p>
       {current.latestModified !== null && <p className="muted">Latest file modification: {new Date(current.latestModified * 1000).toLocaleDateString('en-GB')}. Not a last-use date.</p>}
