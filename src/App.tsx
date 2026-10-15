@@ -211,8 +211,6 @@ export default function App() {
       {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available only in the desktop application.</div>}
       {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={exitDemo}>Exit demo</button></div>}
       {previousReport && report && <div className="notice-banner" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
-      {error && <div className="error-banner" role="alert">{error}<button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
-      {notice && <div className="notice-banner" role="status">{notice}</div>}
       <section className="scope panel" aria-label="Scan configuration">
         <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>
         <div className="root-list">{roots.map(root => <span className="root-chip" key={root} title={root}><Icon name="folder"/><span>{visiblePath(root)}</span><button disabled={busy} aria-label={`Remove ${root}`} onClick={() => setRoots(old => old.filter(p => p !== root))}>×</button></span>)}</div>
@@ -239,6 +237,10 @@ export default function App() {
 
         <footer className="export-bar panel"><div><strong>Your analysis stays local.</strong><span>No cleanup has been performed. Exports can contain sensitive path metadata.</span></div><label><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/>Redacted summary</label><button onClick={() => exportReport('md')} disabled={exporting}><Icon name="download"/>Markdown</button><button onClick={() => exportReport('json')} disabled={exporting}><Icon name="download"/>Export JSON</button></footer>
       </>}
+      {(error || notice) && <div className="feedback-region" aria-label="Notifications">
+        {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
+        {notice && <div className="notice-banner" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice('')}>×</button></div>}
+      </div>}
     </main>
   </div>;
 }
