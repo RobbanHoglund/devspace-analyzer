@@ -33,6 +33,8 @@ function Icon({ name }: { name: string }) {
 function Badge({ risk }: { risk: Risk }) { return <span className={`badge risk-${risk}`}>{risk === 'protected' ? '◈ ' : '• '}{labels[risk]}</span>; }
 
 export default function App() {
+  const drawerRef = useRef<HTMLDialogElement>(null);
+  const [compactDetails, setCompactDetails] = useState(() => window.matchMedia('(max-width:1250px)').matches);
   const toolbarRef = useRef<HTMLDivElement>(null);
   const [scopeExpanded, setScopeExpanded] = useState(false);
   const detailRef = useRef<HTMLElement>(null);
@@ -116,8 +118,22 @@ export default function App() {
   const bounds = pageBounds(requestedPage, filtered.length);
   const page = bounds.page;
   useEffect(() => { if (requestedPage !== page) setPage(page); }, [page, requestedPage]);
-  useEffect(() => { detailRef.current?.scrollTo({top: 0}); }, [selected]);
+  useEffect(() => { detailRef.current?.scrollTo({top: 0}); drawerRef.current?.scrollTo({top: 0}); }, [selected]);
   const current = filtered.find(f => f.id === selected);
+  useEffect(() => {
+    const media = window.matchMedia('(max-width:1250px)');
+    const changed = () => setCompactDetails(media.matches);
+    media.addEventListener('change', changed); return () => media.removeEventListener('change', changed);
+  }, []);
+  useEffect(() => {
+    const drawer = drawerRef.current;
+    if (compactDetails && current && tab === 'findings') {
+      if (drawer && !drawer.open) drawer.showModal();
+      const previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden';
+      return () => { drawer?.close(); document.body.style.overflow = previousOverflow; };
+    }
+    drawer?.close();
+  }, [compactDetails, current?.id, tab]);
   useEffect(() => { if (selected && !current) setSelected(null); }, [selected, current]);
   const top = findings.filter(f => !isProtected(f, activeProtected) && f.complete).sort((a, b) => b.logicalBytes - a.logicalBytes).slice(0, 3);
   const projectName = (id: string | null) => report?.projects.find(p => p.id === id)?.name ?? 'Shared / global';
@@ -200,6 +216,12 @@ export default function App() {
     finally { setExporting(false); }
   }
 
+  const drawerActive = compactDetails && !!current && tab === 'findings';
+  const feedback = (error || notice) && <div className="feedback-region" aria-label="Notifications">
+        {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
+        {notice && <div className="notice-banner" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice('')}>×</button></div>}
+      </div>;
+
   const detailPanel = <aside ref={detailRef} className="detail panel" aria-label="Finding details">
     {current ? <>
       <div className="section-heading"><span className="eyebrow">FINDING DETAILS</span><button className="icon-button" aria-label="Close finding details" onClick={() => setSelected(null)}><Icon name="close"/></button></div>
@@ -271,7 +293,7 @@ export default function App() {
           <section className="panel ecosystem-strip">{groups.map(group => <button key={group.name} onClick={() => { clearFilters(); setEco(group.name); setTab('findings'); }}><span className={`eco-label eco-${group.name}`}>{group.name}</span><strong>{bytes(group.value)}</strong><small>{findings.filter(f => f.ecosystem === group.name).length} findings<Icon name="arrow"/></small></button>)}</section>
         </>}
 
-        {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} className={selected === f.id ? 'selected' : ''}><td><button className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{detailPanel}</div>}
+        {tab === 'findings' && <div className="workspace-grid"><section className="panel results-panel"><div className="section-heading"><h2>Findings <span className="count">{filtered.length.toLocaleString()}</span></h2>{hasFilters && <button className="text-button" onClick={clearFilters}>Clear filters</button>}</div>{canReturnToFindings && <button className="text-button return-findings" onClick={returnToFindings}>Back to previous findings</button>}{hasEnclosingFinding && <p className="note project-context" role="status">This project is inside protected storage. Inspect the enclosing findings below; its contents are not listed separately.</p>}<div className="filters"><input aria-label="Search findings" placeholder="Search folders, projects or categories…" value={query} onChange={e => setQuery(e.target.value)}/><select aria-label="Ecosystem filter" value={eco} onChange={e => setEco(e.target.value)}><option value="all">All ecosystems</option>{groups.map(g => <option key={g.name}>{g.name}</option>)}</select><select aria-label="Risk filter" value={risk} onChange={e => setRisk(e.target.value)}><option value="all">All risks</option>{Object.entries(labels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><select aria-label="Project filter" value={projectFilter} onChange={e => setProjectFilter(e.target.value)}><option value="all">All locations</option><option value="global">Shared / global</option>{report.projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select><select aria-label="Sort findings" value={sort} onChange={e => setSort(e.target.value)}><option value="size">Largest first</option><option value="name">Path A–Z</option><option value="risk">Risk</option></select></div><div className="table-scroll"><table><thead><tr><th>Finding / location</th><th>Project</th><th className="number">Logical size</th><th>Assessment</th></tr></thead><tbody>{filtered.slice(bounds.start, bounds.end).map(f => <tr key={f.id} className={selected === f.id ? 'selected' : ''}><td><button className="finding-button" onClick={() => setSelected(f.id)}><strong><i className={`dot eco-${f.ecosystem}`}/>{f.label}</strong><span title={f.path}>{visiblePath(f.path)}</span></button></td><td><span className="project-cell">{projectName(f.projectId)}</span></td><td className="number"><strong>{bytes(f.logicalBytes)}</strong><small>{f.files.toLocaleString()} files{!f.complete && ' · partial'}</small></td><td><Badge risk={effectiveRisk(f, activeProtected)}/></td></tr>)}</tbody></table>{filtered.length === 0 && <div className="empty-results"><h3>{findings.length ? "No findings match these filters." : "No recognized developer data in this scan."}</h3><p>{findings.length ? "Try another category or clear the filters." : "Measured files may not match a supported category. Check coverage or change the scan scope."}</p>{findings.length ? <button onClick={clearFilters}>Clear filters</button> : <button onClick={() => setTab('coverage')}>Review coverage</button>}</div>}</div><div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total}` : '0 findings'}</span><div><button disabled={page === 0} onClick={() => setPage(page - 1)}>Previous</button><button disabled={page >= bounds.last} onClick={() => setPage(page + 1)}>Next</button></div></div></section>{compactDetails ? <dialog ref={drawerRef} className="finding-drawer" aria-label="Finding details" onCancel={event => { event.preventDefault(); setSelected(null); }}>{current && detailPanel}{drawerActive && feedback}</dialog> : detailPanel}</div>}
 
         {tab === 'projects' && <section className="panel projects-panel"><div className="section-heading"><h2>Project inventory</h2><span className="muted">Owned bytes exclude nested projects</span></div><p className="muted">Manifests and Git markers are detected statically. The working tree and other branches are not evaluated.</p><div className="table-scroll"><table><thead><tr><th>Project / path</th><th>Build context</th><th>Dependency evidence</th><th className="number">Owned logical size</th><th></th></tr></thead><tbody>{report.projects.slice().sort((a, b) => b.ownedLogicalBytes - a.ownedLogicalBytes).map(p => <tr key={p.id}><td><strong>{p.name}</strong><small className="mono wrap">{visiblePath(p.path)}</small><small>{p.gitKind ?? 'No Git marker'}{p.branch ? ` · ${p.branch}` : ''}{p.workspace ? ' · workspace' : ''}</small></td><td><div className="tags">{p.ecosystems.map(e => <span key={e} className={`eco-label eco-${e}`}>{e}</span>)}</div>{p.wrapperVersion && <small>Gradle wrapper {p.wrapperVersion}</small>}</td><td>{p.lockfiles.length ? <><strong>{p.lockfiles.length} lockfile marker(s)</strong><small>{p.lockfiles.join(', ')}</small></> : <span className="muted">No recognized lockfile</span>}<small>Reproducibility not verified</small></td><td className="number"><strong>{bytes(p.ownedLogicalBytes)}</strong><small>{bytes(p.artifactBytes)} identified artifacts</small>{p.contextOnly && <small>Context from parent · sizes within selected scope only</small>}</td><td><button onClick={() => inspectProject(p.id)}>Inspect<Icon name="arrow"/></button></td></tr>)}</tbody></table></div>{!report.projects.length && <div className="empty-results">No project markers found. Shared-cache-only scans may have no projects.</div>}</section>}
 
@@ -279,10 +301,7 @@ export default function App() {
 
 
       </>}
-      {(error || notice) && <div className="feedback-region" aria-label="Notifications">
-        {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
-        {notice && <div className="notice-banner" role="status"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice('')}>×</button></div>}
-      </div>}
+      {!drawerActive && feedback}
     </main>
   </div>;
 }
