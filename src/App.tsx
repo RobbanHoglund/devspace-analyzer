@@ -7,6 +7,7 @@ import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, 
 import { demoReport } from './demo';
 import { pageBounds } from './pagination';
 import { scopeKey, type ScanScope } from './scanScope';
+import { unclassifiedMeasuredBytes } from './measurement';
 import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectInventory';
 import { ProtectionControls } from './ProtectionControls';
 
@@ -102,6 +103,7 @@ export default function App() {
     observer.observe(element); return () => observer.disconnect();
   }, [report]);
   const scopeChanged = origin === 'native' && !!reportScope && scopeKey(reportScope) !== scopeKey({roots, includeCaches});
+  const unclassified = report ? unclassifiedMeasuredBytes(report) : null;
   const findings = report?.findings ?? [];
   const summary = useMemo(() => summarize(findings, activeProtected), [findings, activeProtected]);
   const groups = useMemo(() => {
@@ -304,6 +306,7 @@ export default function App() {
 
 
         {tab === 'overview' && <>
+          <section className="size-context panel" aria-label="Measurement coverage"><p><strong>{bytes(report.progress.logicalBytes)} measured</strong> · {bytes(summary.identified)} identified · {unclassified === null ? 'Unclassified amount unavailable' : `${bytes(unclassified)} unclassified measured data`}</p><details><summary>How to interpret these sizes</summary><p>Protected data and review candidates are parts of identified data. Unclassified files are outside the recognized categories.{!report.complete && ' Partial scan: these totals cover measured files only; unread data is not estimated.'} Logical size is not physical allocation or guaranteed savings.</p></details></section>
           <div className="overview-grid"><section className="panel chart-panel"><div className="section-heading"><h2>Where the space is</h2><span className="muted">Classified logical bytes</span></div><div className="storage-bars" aria-label="Storage by ecosystem">{groups.map(group => <button className={`storage-bar eco-${group.name}`} key={group.name} onClick={() => { clearFilters(); setEco(group.name); setSelected(null); setTab('findings'); }}>
             <span className="storage-bar-label"><span><i className={`dot eco-${group.name}`}/>{group.name}</span><strong>{bytes(group.value)} <small>{(group.value / Math.max(summary.identified,1) * 100).toFixed(1)}%</small></strong></span>
             <span className="storage-track" aria-hidden="true"><span style={{width:`${group.value / Math.max(summary.identified,1) * 100}%`}}/></span>
