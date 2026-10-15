@@ -10,6 +10,7 @@ export interface Project {
   id: string; name: string; path: string; ecosystems: string[]; markers: string[]; lockfiles: string[];
   gitKind: string | null; branch: string | null; wrapperVersion: string | null; workspace: boolean;
   ownedLogicalBytes: number; artifactBytes: number;
+  contextOnly?: boolean;
 }
 export interface Report {
   schemaVersion: number; startedAt: number; durationMs: number; roots: string[];

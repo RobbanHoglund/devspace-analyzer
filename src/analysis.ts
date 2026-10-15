@@ -76,7 +76,7 @@ export function redactedReport(report: Report): Report {
     schemaVersion: report.schemaVersion, startedAt: report.startedAt, durationMs: report.durationMs,
     roots: report.roots.map((_, i) => `[scope-${i + 1}]`),
     globalCaches: report.globalCaches.map((c, i) => ({ path: `[cache-${i + 1}]`, ecosystem: safeEco(c.ecosystem), kind: 'shared-storage', source: 'Location source withheld' })),
-    projects: report.projects.map((p, i) => ({ id: `p${i}`, name: `Project ${i + 1}`, path: `[project-${i + 1}]`, ecosystems: p.ecosystems.map(safeEco), markers: [], lockfiles: [], gitKind: p.gitKind === 'worktree' ? 'worktree' : p.gitKind === 'repository' ? 'repository' : null, branch: null, wrapperVersion: null, workspace: p.workspace, ownedLogicalBytes: p.ownedLogicalBytes, artifactBytes: p.artifactBytes })),
+    projects: report.projects.map((p, i) => ({ id: `p${i}`, name: `Project ${i + 1}`, path: `[project-${i + 1}]`, ecosystems: p.ecosystems.map(safeEco), markers: [], lockfiles: [], gitKind: p.gitKind === 'worktree' ? 'worktree' : p.gitKind === 'repository' ? 'repository' : null, branch: null, wrapperVersion: null, workspace: p.workspace, contextOnly: p.contextOnly, ownedLogicalBytes: p.ownedLogicalBytes, artifactBytes: p.artifactBytes })),
     findings: report.findings.map((f, i) => ({
       id: `f${i}`, path: `[finding-${i + 1}]`, label: `${safeEco(f.ecosystem)} storage ${i + 1}`, ecosystem: safeEco(f.ecosystem), kind: 'classified-storage',
       risk: ['low', 'review', 'protected'].includes(f.risk) ? f.risk : 'protected', confidence: 'See local report',

@@ -67,7 +67,7 @@ fn project(root: &Path, index: usize) -> Option<Project> {
     Some(Project {
         id: format!("p{index}"), name: root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| display(root)), path: display(root),
         ecosystems, markers, lockfiles: LOCKS.iter().filter(|m| regular(&root.join(m))).map(|s| s.to_string()).collect(),
-        git_kind, branch, wrapper_version: wrapper_version(root), workspace, owned_logical_bytes: 0, artifact_bytes: 0,
+        git_kind, branch, wrapper_version: wrapper_version(root), workspace, context_only: false, owned_logical_bytes: 0, artifact_bytes: 0,
     })
 }
 /// Interpret only CPython's tagged cache filenames. Strip the suffix from the
