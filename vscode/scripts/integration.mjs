@@ -1,12 +1,12 @@
 import { downloadAndUnzipVSCode, runTests, resolveCliArgsFromVSCodeExecutablePath } from '@vscode/test-electron';
-import { spawnSync } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm, readFile } from 'node:fs/promises';
+import { spawn, spawnSync } from 'node:child_process';
+import { mkdtemp, mkdir, writeFile, rm, readFile, realpath } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 const extensionRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const root = path.dirname(extensionRoot);
-const temporary = await mkdtemp(path.join(tmpdir(), 'devspace-vsix-test-'));
+const temporary = await realpath(await mkdtemp(path.join(tmpdir(), 'devspace-vsix-test-')));
 const restricted = process.argv.includes('--restricted');
 try {
   const fixture = path.join(temporary, 'workspace'); const extensions = path.join(temporary, 'extensions'); const profile = path.join(temporary, 'profile');
@@ -26,10 +26,23 @@ try {
   const install = spawnSync(cli, [...cliArgs, '--install-extension', vsix, '--extensions-dir', extensions, '--user-data-dir', profile, '--force', '--no-sandbox'], { encoding: 'utf8', shell: process.platform === 'win32' });
   process.stdout.write(install.stdout ?? ''); process.stderr.write(install.stderr ?? '');
   if (install.status !== 0) throw new Error('VSIX installation failed.');
-  await runTests({
+  const options = {
     vscodeExecutablePath: executable, extensionDevelopmentPath: path.join(extensionRoot, 'test', 'harness'),
     extensionTestsPath: path.join(extensionRoot, 'dist', 'vscode', 'test', 'integration.js'),
     extensionTestsEnv: { npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, DEVSPACE_TEST_ROOT: temporary, DEVSPACE_RESTRICTED: restricted ? '1' : '0', DEVSPACE_ARTIFACTS: path.join(root, 'artifacts') },
     launchArgs: [fixture, '--extensions-dir', extensions, '--user-data-dir', profile, '--skip-welcome', '--skip-release-notes', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=9228', ...(restricted ? [] : ['--disable-workspace-trust'])],
-  });
+  };
+  if (restricted) {
+    // test-electron unconditionally adds --disable-workspace-trust. Launch this
+    // isolated test host ourselves so the real Restricted Mode can be exercised.
+    await new Promise((resolve, reject) => {
+      const child = spawn(executable, [...options.launchArgs,
+        `--extensionDevelopmentPath=${options.extensionDevelopmentPath}`,
+        `--extensionTestsPath=${options.extensionTestsPath}`,
+      ], { env: { ...process.env, ...options.extensionTestsEnv }, stdio: 'inherit' });
+      const timeout = setTimeout(() => { child.kill(); reject(new Error('Restricted Mode test timed out.')); }, 120000);
+      child.on('error', error => { clearTimeout(timeout); reject(error); });
+      child.on('close', code => { clearTimeout(timeout); code === 0 ? resolve() : reject(new Error(`Restricted Mode test failed (${code}).`)); });
+    });
+  } else await runTests(options);
 } finally { await rm(temporary, { recursive: true, force: true, maxRetries: 5, retryDelay: 500 }); }

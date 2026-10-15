@@ -17,6 +17,8 @@ export async function run(): Promise<void> {
   const api = await extension.activate();
   const commands = await vscode.commands.getCommands(true);
   for (const name of ['open', 'scanWorkspace', 'scanFolder', 'cancel', 'findings', 'coverage']) assert.ok(commands.includes(`devspace.${name}`));
+  await vscode.commands.executeCommand('workbench.view.extension.devspace');
+  if (commands.includes('workbench.action.closeAuxiliaryBar')) await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
   await vscode.commands.executeCommand('devspace.open');
   await waitFor(() => api.getStatus().ready, 'Packaged webview did not become ready (check CSP and assets)');
   const browser = await chromium.connectOverCDP('http://127.0.0.1:9228');

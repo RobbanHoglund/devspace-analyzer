@@ -18,7 +18,7 @@ const request = root => ({ roots: [root], includeGlobalCaches: false, protectedP
 let configDirectory;
 const previousConfig = Object.entries(process.env).filter(([key]) => /^npm_config_userconfig$/i.test(key));
 before(async () => {
-  configDirectory = await fs.mkdtemp(path.join(os.tmpdir(), 'devspace-test-config-'));
+  configDirectory = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'devspace-test-config-')));
   const config = path.join(configDirectory, 'npmrc'); await fs.writeFile(config, '');
   for (const [key] of previousConfig) delete process.env[key];
   process.env.npm_config_userconfig = config;
@@ -29,7 +29,7 @@ after(async () => {
   await fs.rm(configDirectory, { recursive: true, force: true });
 });
 async function fixture(t) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'devspace-vscode-'));
+  const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), 'devspace-vscode-')));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.mkdir(path.join(root, 'node_modules', 'example'), { recursive: true });
   await fs.writeFile(path.join(root, 'package.json'), '{"name":"read-only-fixture","scripts":{"postinstall":"exit 99"}}');
@@ -76,6 +76,8 @@ test('scanner rejects incompatible protocol and oversized input', async () => {
   }
   const incompatible = await run(JSON.stringify({ protocolVersion: 2, request: request(extensionRoot) }) + '\n');
   assert.equal(incompatible.code, 1); assert.match(incompatible.output, /Unsupported scanner protocol/);
+  const incomplete = await run(JSON.stringify({ protocolVersion: 1, request: {} }) + '\n');
+  assert.equal(incomplete.code, 1); assert.match(incomplete.output, /Invalid scan request/);
   const oversized = await run('x'.repeat(2 * 1024 * 1024 + 1) + '\n');
   assert.equal(oversized.code, 1); assert.match(oversized.output, /at most 2 MiB/);
 });

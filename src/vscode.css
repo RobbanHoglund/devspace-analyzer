@@ -54,6 +54,8 @@ body.devspace-vscode.vscode-dark,body.devspace-vscode.vscode-high-contrast{color
 .devspace-vscode input::placeholder{color:var(--vscode-input-placeholderForeground)}
 .devspace-vscode button:focus-visible,.devspace-vscode input:focus-visible,.devspace-vscode select:focus-visible,.devspace-vscode summary:focus-visible{outline-color:var(--vscode-focusBorder)}
 .devspace-vscode td{border-color:var(--border)}
+/* Keep absolutely positioned accessible table labels inside the scroll container. */
+.devspace-vscode .table-scroll{position:relative}
 .devspace-vscode .scope-top .muted{max-width:none}
 .devspace-vscode .scope-actions{align-items:center;flex-wrap:wrap}
 .devspace-vscode .scope-options form{min-width:min(260px,100%)}
@@ -76,6 +78,8 @@ body.devspace-vscode.vscode-dark,body.devspace-vscode.vscode-high-contrast{color
   .devspace-vscode .scope-top{flex-wrap:wrap;align-items:flex-start}
   .devspace-vscode .overview-grid,.devspace-vscode .coverage-grid{grid-template-columns:1fr}
   .devspace-vscode .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .devspace-vscode .report-present:not(.tab-overview) .metric{flex:1 0 45%;gap:8px}
+  .devspace-vscode .section-heading{flex-wrap:wrap}
   .devspace-vscode .scope-actions{gap:6px}
   .devspace-vscode .welcome{padding:24px 18px}
   .devspace-vscode .welcome-steps{grid-template-columns:1fr;gap:16px}

@@ -10,7 +10,11 @@ const MAX_INPUT: u64 = 2 * 1024 * 1024;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct Start { protocol_version: u32, request: ScanRequest }
+struct Start { protocol_version: u32, request: ExplicitRequest }
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ExplicitRequest { roots: Vec<String>, include_global_caches: bool, protected_paths: Vec<String> }
 
 fn emit(value: serde_json::Value) -> io::Result<()> {
     let mut out = io::stdout().lock();
@@ -31,6 +35,7 @@ fn run() -> Result<(), String> {
     let start: Start = serde_json::from_str(&line).map_err(|_| "Invalid scan request")?;
     if start.protocol_version != 1 { return Err("Unsupported scanner protocol version.".into()); }
     drop(input);
+    let request = ScanRequest { roots: start.request.roots, include_global_caches: start.request.include_global_caches, protected_paths: start.request.protected_paths };
 
     let cancelled = Arc::new(AtomicBool::new(false));
     let signal = cancelled.clone();
@@ -51,7 +56,7 @@ fn run() -> Result<(), String> {
             }
         }
     });
-    let report = devspace_core::scan(start.request, &cancelled, |progress| {
+    let report = devspace_core::scan(request, &cancelled, |progress| {
         if emit(json!({"type":"progress", "data":progress})).is_err() {
             cancelled.store(true, Ordering::Relaxed);
         }

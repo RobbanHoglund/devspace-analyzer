@@ -40,7 +40,12 @@ for (const width of [380, 760, 1440]) {
     await expect(page.getByText('Browser preview', { exact: false })).toHaveCount(0);
     for (const name of ['Overview', 'Findings', 'Projects', 'Scan coverage']) {
       await page.getByRole('navigation').getByRole('button', { name, exact: true }).click();
-      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+      const overflow = await page.evaluate(() => ({
+        width: innerWidth, document: document.documentElement.scrollWidth,
+        elements: [...document.querySelectorAll('body *')].map(e => ({ tag:e.tagName, class:e.className, x:e.getBoundingClientRect().x, right:e.getBoundingClientRect().right })).filter(e => e.right > innerWidth + 1).slice(0,20),
+      }));
+      if (overflow.document > overflow.width + 1) console.log('VS_CODE_OVERFLOW', name, JSON.stringify(overflow));
+      expect(overflow.document, `Overflow in ${name}`).toBeLessThanOrEqual(overflow.width + 1);
     }
     await page.getByRole('navigation').getByRole('button', { name: 'Findings', exact: true }).click();
     const label = await page.locator('.finding-button strong').first().innerText();
