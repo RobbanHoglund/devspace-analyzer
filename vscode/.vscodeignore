@@ -1,0 +1,10 @@
+**/*
+!package.json
+!README.md
+!CHANGELOG.md
+!LICENSE
+!resources/**
+!dist/vscode/src/**
+!media/**
+!bin/**
+!THIRD_PARTY_NOTICES.txt

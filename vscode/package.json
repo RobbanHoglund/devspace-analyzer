@@ -1,0 +1,151 @@
+{
+  "name": "devspace-analyzer",
+  "displayName": "DevSpace Analyzer",
+  "description": "Local, read-only analysis of developer projects, build output and shared caches.",
+  "version": "0.1.0",
+  "publisher": "RobbanHoglund",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/RobbanHoglund/devspace-analyzer.git"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "keywords": [
+    "disk",
+    "storage",
+    "gradle",
+    "maven",
+    "node",
+    "python"
+  ],
+  "main": "./dist/vscode/src/extension.js",
+  "extensionKind": [
+    "ui"
+  ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "Demo viewing is available. Filesystem scanning and folder access require a trusted local workspace."
+    },
+    "virtualWorkspaces": {
+      "supported": false,
+      "description": "The scanner requires local filesystem directories."
+    }
+  },
+  "activationEvents": [
+    "onView:devspace.navigation"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "devspace.open",
+        "title": "Open Analyzer",
+        "category": "DevSpace",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "devspace.scanWorkspace",
+        "title": "Scan Workspace",
+        "category": "DevSpace",
+        "icon": "$(search)",
+        "enablement": "isWorkspaceTrusted && !remoteName && !devspace.scanning"
+      },
+      {
+        "command": "devspace.scanFolder",
+        "title": "Scan Folder…",
+        "category": "DevSpace",
+        "icon": "$(folder-opened)",
+        "enablement": "isWorkspaceTrusted && !remoteName && !devspace.scanning"
+      },
+      {
+        "command": "devspace.cancel",
+        "title": "Cancel Scan",
+        "category": "DevSpace",
+        "icon": "$(debug-stop)",
+        "enablement": "devspace.scanning"
+      },
+      {
+        "command": "devspace.overview",
+        "title": "Show Overview",
+        "category": "DevSpace"
+      },
+      {
+        "command": "devspace.findings",
+        "title": "Show Findings",
+        "category": "DevSpace"
+      },
+      {
+        "command": "devspace.projects",
+        "title": "Show Projects",
+        "category": "DevSpace"
+      },
+      {
+        "command": "devspace.coverage",
+        "title": "Show Scan Coverage",
+        "category": "DevSpace"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "devspace",
+          "title": "DevSpace",
+          "icon": "resources/devspace.svg"
+        }
+      ]
+    },
+    "views": {
+      "devspace": [
+        {
+          "id": "devspace.navigation",
+          "name": "DevSpace Analyzer"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "devspace.scanWorkspace",
+          "when": "view == devspace.navigation && !devspace.scanning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devspace.cancel",
+          "when": "view == devspace.navigation && devspace.scanning",
+          "group": "navigation@1"
+        },
+        {
+          "command": "devspace.open",
+          "when": "view == devspace.navigation",
+          "group": "navigation@2"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "devspace.scanFolder",
+          "when": "explorerResourceIsFolder && resourceScheme == file && !remoteName",
+          "group": "navigation@20"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "build": "node scripts/build.mjs",
+    "test": "npm run compile && node --test test/*.test.cjs",
+    "test:integration": "node scripts/integration.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.5",
+    "@types/vscode": "1.85.0",
+    "@vscode/test-electron": "3.1.0",
+    "@vscode/vsce": "4.0.0",
+    "typescript": "5.9.3"
+  }
+}

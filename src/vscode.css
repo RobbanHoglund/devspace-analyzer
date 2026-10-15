@@ -1,0 +1,100 @@
+/* Semantic overrides preserve the desktop palette while following the active VS Code theme. */
+body.devspace-vscode {
+  --bg:var(--vscode-editor-background);
+  --panel:var(--vscode-editor-background);
+  --border:var(--vscode-panel-border,var(--vscode-widget-border,#80808060));
+  --text:var(--vscode-editor-foreground);
+  --muted:var(--vscode-descriptionForeground);
+  --accent:var(--vscode-textLink-foreground);
+  --surface-input:var(--vscode-input-background);
+  --surface-raised:var(--vscode-sideBar-background,var(--bg));
+  --surface-sidebar:var(--bg);
+  --surface-hover:var(--vscode-list-hoverBackground);
+  --surface-selected:var(--vscode-list-inactiveSelectionBackground);
+  --surface-info:color-mix(in srgb,var(--vscode-charts-blue) 12%,var(--bg));
+  --surface-success:color-mix(in srgb,var(--vscode-charts-green) 10%,var(--bg));
+  --surface-warning:color-mix(in srgb,var(--vscode-editorWarning-foreground) 10%,var(--bg));
+  --surface-error:color-mix(in srgb,var(--vscode-errorForeground) 10%,var(--bg));
+  --border-strong:var(--vscode-widget-border,var(--border));
+  --border-success:var(--vscode-charts-green);
+  --border-warning:var(--vscode-editorWarning-foreground);
+  --border-error:var(--vscode-errorForeground);
+  --on-accent:var(--vscode-button-foreground);
+  --primary-hover:var(--vscode-button-hoverBackground);
+  --link-hover:var(--vscode-textLink-activeForeground);
+  --muted-text:var(--muted);
+  --body-text:var(--text);
+  --success-text:var(--vscode-charts-green);
+  --info-text:var(--vscode-charts-blue);
+  --warning-text:var(--vscode-editorWarning-foreground);
+  --error-text:var(--vscode-errorForeground);
+  color-scheme:light dark;
+  font-family:var(--vscode-font-family,system-ui);
+  font-size:var(--vscode-font-size,13px);
+  padding:0;
+}
+body.devspace-vscode.vscode-light,body.devspace-vscode.vscode-high-contrast-light{color-scheme:light}
+body.devspace-vscode.vscode-dark,body.devspace-vscode.vscode-high-contrast{color-scheme:dark}
+.devspace-vscode .app-shell{display:block;min-width:0}
+.devspace-vscode .sidebar{position:static;height:auto;padding:8px 12px;border:0;border-bottom:1px solid var(--border);background:var(--bg)}
+.devspace-vscode .brand,.devspace-vscode .nav-label,.devspace-vscode .sidebar-bottom{display:none}
+.devspace-vscode .sidebar nav{flex-direction:row;flex-wrap:wrap;margin:0;gap:4px}
+.devspace-vscode .sidebar nav button{font-size:13px;padding:7px 10px;justify-content:center;flex:1 0 auto}
+.devspace-vscode .sidebar nav .nav-text{display:inline;font-size:13px;white-space:normal}
+.devspace-vscode .sidebar nav .nav-count{display:inline;background:var(--vscode-badge-background);color:var(--vscode-badge-foreground)}
+.devspace-vscode .sidebar nav button.active{color:var(--vscode-list-activeSelectionForeground);background:var(--vscode-list-activeSelectionBackground);border-color:var(--vscode-focusBorder)}
+.devspace-vscode .sidebar nav button .nav-tooltip{display:none!important}
+.devspace-vscode main{padding:20px;max-width:none}
+.devspace-vscode h1{font-size:23px}
+.devspace-vscode .topbar .eyebrow{display:none}
+.devspace-vscode .topbar{margin-bottom:16px}
+.devspace-vscode .primary{background:var(--vscode-button-background);border-color:var(--vscode-button-border,transparent);color:var(--vscode-button-foreground)}
+.devspace-vscode .primary:hover:not(:disabled){background:var(--vscode-button-hoverBackground)}
+.devspace-vscode input,.devspace-vscode select{color:var(--vscode-input-foreground);border-color:var(--vscode-input-border,var(--border))}
+.devspace-vscode input::placeholder{color:var(--vscode-input-placeholderForeground)}
+.devspace-vscode button:focus-visible,.devspace-vscode input:focus-visible,.devspace-vscode select:focus-visible,.devspace-vscode summary:focus-visible{outline-color:var(--vscode-focusBorder)}
+.devspace-vscode td{border-color:var(--border)}
+.devspace-vscode .scope-top .muted{max-width:none}
+.devspace-vscode .scope-actions{align-items:center;flex-wrap:wrap}
+.devspace-vscode .scope-options form{min-width:min(260px,100%)}
+.devspace-vscode .host-unavailable{padding:12px;border:1px solid var(--border-warning);background:var(--surface-warning);margin-bottom:12px;border-radius:6px}
+.devspace-vscode .eco-Gradle{--eco:var(--vscode-charts-green)}
+.devspace-vscode .eco-Node{--eco:var(--vscode-charts-blue)}
+.devspace-vscode .eco-Maven{--eco:var(--vscode-charts-orange)}
+.devspace-vscode .eco-Python{--eco:var(--vscode-charts-purple)}
+.devspace-vscode .eco-Containers{--eco:var(--vscode-charts-yellow)}
+.devspace-vscode .eco-Git,.devspace-vscode .eco-Other{--eco:var(--muted)}
+.devspace-vscode [class*="eco-"]{--eco-bg:color-mix(in srgb,var(--eco) 12%,var(--bg))}
+.devspace-vscode .detail{scrollbar-color:var(--vscode-scrollbarSlider-background) transparent}
+.devspace-vscode .finding-drawer{border-color:var(--vscode-widget-border,var(--border))}
+.devspace-vscode .export-popover{background:var(--vscode-editorWidget-background,var(--panel));width:min(470px,calc(100vw - 48px))}
+.devspace-vscode .report-toolbar{z-index:15}
+.devspace-vscode.vscode-high-contrast,.devspace-vscode.vscode-high-contrast-light{--border:var(--vscode-contrastBorder);--border-strong:var(--vscode-contrastBorder)}
+.devspace-vscode.vscode-high-contrast .badge,.devspace-vscode.vscode-high-contrast-light .badge{background:var(--bg);color:var(--text);border-color:var(--vscode-contrastBorder)}
+@media(max-width:800px){
+  .devspace-vscode main{padding:14px}
+  .devspace-vscode .scope-top{flex-wrap:wrap;align-items:flex-start}
+  .devspace-vscode .overview-grid,.devspace-vscode .coverage-grid{grid-template-columns:1fr}
+  .devspace-vscode .metrics{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .devspace-vscode .scope-actions{gap:6px}
+  .devspace-vscode .welcome{padding:24px 18px}
+  .devspace-vscode .welcome-steps{grid-template-columns:1fr;gap:16px}
+  .devspace-vscode .table-scroll{max-width:100%}
+  .devspace-vscode .table-scroll table{min-width:560px}
+  .devspace-vscode .finding-drawer{inset:8px;width:calc(100vw - 16px);height:calc(100dvh - 16px)}
+}
+@media(max-width:480px){
+  .devspace-vscode main{padding:10px}
+  .devspace-vscode .sidebar{padding:6px}
+  .devspace-vscode .sidebar nav{gap:2px}
+  .devspace-vscode .sidebar nav button{flex:1 0 44%;justify-content:flex-start}
+  .devspace-vscode .topbar{flex-wrap:wrap;gap:8px}
+  .devspace-vscode .metrics{gap:6px}
+  .devspace-vscode .metric{padding:10px}
+  .devspace-vscode .metric>strong{font-size:24px}
+  .devspace-vscode .scope{padding:12px}
+  .devspace-vscode .report-present:not(.tab-overview) .metric{flex:1 0 45%;flex-direction:column;gap:0}
+  .devspace-vscode .scope-options label{white-space:normal}
+  .devspace-vscode .export-options{flex:1 0 100%}
+  .devspace-vscode .feedback-region{right:12px;bottom:12px;width:calc(100vw - 24px)}
+}

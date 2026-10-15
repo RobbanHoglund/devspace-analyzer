@@ -88,3 +88,7 @@ docs/          Safety, review fixes and validation limits
 ```
 
 No server, account or database is needed for scanning. The development toolchain and WebView2 installation may require network access; the scanner itself makes no network requests.
+
+## VS Code extension
+
+An installable VS Code pilot lives in [`vscode/`](vscode/README.md). It reuses the Rust scanner and analysis UI, adds an Activity Bar view and workspace/folder commands, and includes its own scanner binary. Download the matching `devspace-vscode-*` artifact from a successful **VS Code extension** workflow, extract the VSIX, then use **Extensions → … → Install from VSIX…**. Local trusted desktop windows are supported; shared cache scanning is opt-in. See the extension README for installation, platform limits and development checks.

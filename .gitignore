@@ -8,3 +8,9 @@ test-results/
 .DS_Store
 src-tauri/gen/
 src-tauri/icons/
+
+vscode/media/
+vscode/bin/
+vscode/.vscode-test/
+vscode/THIRD_PARTY_NOTICES.txt
+*.vsix
