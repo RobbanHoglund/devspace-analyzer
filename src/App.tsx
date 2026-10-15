@@ -9,6 +9,7 @@ import { pageBounds } from './pagination';
 import { scopeKey, type ScanScope } from './scanScope';
 import { unclassifiedMeasuredBytes } from './measurement';
 import { WarningBrowser, emptyWarningView, type WarningView } from './WarningBrowser';
+import { ExportControls } from './ExportControls';
 import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectInventory';
 import { ProtectionControls } from './ProtectionControls';
 
@@ -229,7 +230,7 @@ export default function App() {
     try {
       if (native) {
         const saved = await invoke<string | null>('save_export', { content, extension });
-        if (saved) setNotice(`Report saved: ${visiblePath(saved)}`);
+        if (saved) setNotice(`Report saved: ${visiblePath(saved)} · ${redact ? 'Redacted summary' : 'Full report'}`);
       } else {
         const url = URL.createObjectURL(new Blob([content], { type: extension === 'json' ? 'application/json' : 'text/markdown' }));
         const a = document.createElement('a'); a.href = url; a.download = `devspace-${origin}-${redact ? 'redacted' : 'full'}.${extension}`;
@@ -306,7 +307,7 @@ export default function App() {
       </section>
 
       {!report ? <section className="welcome panel"><div className="welcome-icon"><Icon name="scan"/></div><span className="eyebrow">LESS GUESSWORK. MORE CONTEXT.</span><h2>Find the weight in your development workspace.</h2><p>Understand Gradle and Maven storage, Node dependencies and Python environments — with explicit evidence, recovery notes and protected data.</p><div className="welcome-steps"><div><b>01</b><strong>Choose your scope</strong><span>Start with your checked-out repositories and shared caches.</span></div><div><b>02</b><strong>Inspect the findings</strong><span>Compare categories, projects and likely recovery costs.</span></div><div><b>03</b><strong>Make an informed decision</strong><span>Export your analysis. This pilot cannot delete anything.</span></div></div><button onClick={loadDemo} disabled={busy}>Explore demo data<Icon name="arrow"/></button></section> : <>
-        <div ref={toolbarRef} className="report-toolbar"><div className="report-bar"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.progress.files.toLocaleString()} files · {bytes(report.progress.logicalBytes)} measured · {(report.durationMs / 1000).toFixed(1)} s</span><button className={`text-button scan-status status-${scanState}`} onClick={() => navigate('coverage')}>{scanLabel}</button></div><footer className="export-bar panel"><div><strong>Your analysis stays local.</strong><span>No cleanup has been performed. Exports can contain sensitive path metadata.</span></div><label><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/>Redacted summary</label><button onClick={() => exportReport('md')} disabled={exporting}><Icon name="download"/>Markdown</button><button onClick={() => exportReport('json')} disabled={exporting}><Icon name="download"/>Export JSON</button></footer></div>
+        <div ref={toolbarRef} className="report-toolbar"><div className="report-bar"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.progress.files.toLocaleString()} files · {bytes(report.progress.logicalBytes)} measured · {(report.durationMs / 1000).toFixed(1)} s</span><button className={`text-button scan-status status-${scanState}`} onClick={() => navigate('coverage')}>{scanLabel}</button></div><ExportControls redacted={redact} onRedactedChange={setRedact} exporting={exporting} onExport={exportReport}/></div>
         <section className="metrics" aria-label="Scan summary"><div className="metric panel"><span>Identified developer data</span><strong>{bytes(summary.identified)}</strong><small>{findings.length.toLocaleString()} classified findings</small></div><div className="metric panel accent"><span>Review candidates</span><strong>{bytes(summary.candidates)}</strong><small>Logical size · not guaranteed savings</small></div><div className="metric panel"><span>Protected data</span><strong>{bytes(summary.protected)}</strong><small>Unique data or personal protection</small></div><div className="metric panel"><span>Projects in scope</span><strong>{report.projects.length}</strong><small>{report.roots.length} effective scan roots</small></div></section>
 
 
