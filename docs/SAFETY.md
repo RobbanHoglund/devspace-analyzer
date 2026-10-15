@@ -14,7 +14,7 @@ Operating-system access timestamps and external software can still change while 
 
 There are three assessments:
 
-- **Lower risk:** stronger, narrow recovery evidence. Currently used only for Python bytecode where each observed `.pyc` has a corresponding source filename and no unrelated entry was found. This is not an unconditional deletion approval.
+- **Lower risk:** stronger, narrow recovery evidence. Currently used only for recognized CPython tagged bytecode filenames where each observed `.pyc` has its exact corresponding source filename and no unrelated entry was found. Dotted source stems are preserved, including optional optimization tags. Unknown, legacy or malformed cache names remain protected. This is not an unconditional deletion approval.
 - **Needs review:** conventional build/dependency/cache data with unresolved recovery conditions.
 - **Protected:** possibly unique data, unknown storage under a known root, or a personal protection preference.
 
