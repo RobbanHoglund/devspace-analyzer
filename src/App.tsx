@@ -32,6 +32,7 @@ function Icon({ name }: { name: string }) {
 function Badge({ risk }: { risk: Risk }) { return <span className={`badge risk-${risk}`}>{risk === 'protected' ? '◈ ' : '• '}{labels[risk]}</span>; }
 
 export default function App() {
+  const detailRef = useRef<HTMLElement>(null);
   const [roots, setRoots] = useState<string[]>(() => readPreference('devspace.roots').slice(0, 32));
   const [protectedPaths, setProtectedPaths] = useState<string[]>(() => readPreference('devspace.protected'));
   const [demoProtected, setDemoProtected] = useState<string[]>([]);
@@ -92,6 +93,7 @@ export default function App() {
   const bounds = pageBounds(requestedPage, filtered.length);
   const page = bounds.page;
   useEffect(() => { if (requestedPage !== page) setPage(page); }, [page, requestedPage]);
+  useEffect(() => { detailRef.current?.scrollTo({top: 0}); }, [selected]);
   const current = filtered.find(f => f.id === selected);
   useEffect(() => { if (selected && !current) setSelected(null); }, [selected, current]);
   const top = findings.filter(f => !isProtected(f, activeProtected) && f.complete).sort((a, b) => b.logicalBytes - a.logicalBytes).slice(0, 3);
@@ -165,7 +167,7 @@ export default function App() {
     finally { setExporting(false); }
   }
 
-  const detailPanel = <aside className="detail panel" aria-label="Finding details">
+  const detailPanel = <aside ref={detailRef} className="detail panel" aria-label="Finding details">
     {current ? <>
       <div className="section-heading"><span className="eyebrow">FINDING DETAILS</span><button className="icon-button" aria-label="Close finding details" onClick={() => setSelected(null)}><Icon name="close"/></button></div>
       <span className={`eco-label eco-${current.ecosystem}`}>{current.ecosystem}</span>
@@ -174,11 +176,11 @@ export default function App() {
       <Badge risk={effectiveRisk(current, activeProtected)}/>
       <div className="path-block">{visiblePath(current.path)}</div>
       <h3>What this means</h3><p>{current.reason}</p>
-      <h3>Evidence, not assumptions</h3><ul>{current.evidence.map((s, i) => <li key={i}>{s}</li>)}</ul>
+      <details key={`evidence-${current.id}`} open={current.evidence.length <= 6}><summary>Evidence, not assumptions ({current.evidence.length})</summary><ul>{current.evidence.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
       {!!current.protectedDescendantCount && <section aria-label="Protected locations">
         <h3>Protected locations</h3>
         <p>Showing {current.protectedDescendants?.length ?? 0} of {current.protectedDescendantCount} protected locations. Nested locations covered by a protected parent are omitted.</p>
-        <ul>{current.protectedDescendants?.map(location => <li key={location.path}><strong>{location.label}</strong><div className="path-block">{visiblePath(location.path)}</div></li>)}</ul>
+        <details key={`locations-${current.id}`} open={(current.protectedDescendants?.length ?? 0) <= 5}><summary>View protected locations</summary><ul>{current.protectedDescendants?.map(location => <li key={location.path}><strong>{location.label}</strong><div className="path-block">{visiblePath(location.path)}</div></li>)}</ul></details>
       </section>}
       {current.wrapperVersion && <div className="note"><strong>Gradle {current.wrapperVersion}</strong><p>{current.wrapperReferences.length ? `Found in: ${current.wrapperReferences.map(projectName).join(', ')}` : 'No matching wrapper in this scan. This does not mean unused.'}</p></div>}
       <h3>Recovery & trade-offs</h3><p>{current.recovery}</p>
