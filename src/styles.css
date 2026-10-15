@@ -12,3 +12,18 @@
 /* Primary analysis copy stays readable at normal desktop scale. */
 .detail>p,.detail li,.detail details,.detail .muted{font-size:14px;line-height:1.65}
 .detail .path-block{font-size:13px}.finding-button>span{font-size:12px;line-height:1.6}.filters select{font-size:13px}.badge{font-size:12px}
+
+/* A report reserves its workspace for analysis, keeping next-scan settings separate. */
+.report-present .topbar{margin-bottom:16px}.report-present .topbar h1{font-size:25px}.report-present .topbar .eyebrow{margin-bottom:4px}
+.report-present .scope{padding:12px 16px;margin-bottom:8px}.scope-actions{flex-wrap:wrap}.scope-actions .text-button{margin:0 4px}
+#scan-settings:not([hidden]){padding-top:12px}#scan-settings[hidden]{display:none}.root-list{max-height:160px;overflow:auto;padding:3px}.root-chip{font-size:12px}.root-chip span{max-width:390px}
+.scope-change{color:#f3d08d;font-size:13px;margin:10px 0 0}
+.report-toolbar{position:sticky;top:0;z-index:15;background:var(--bg);padding:8px 0 12px;margin-bottom:12px;border-bottom:1px solid var(--border)}
+.report-bar{margin:0 0 8px;font-size:12px;line-height:1.5}.export-bar{margin:0;padding:10px 14px;gap:12px}.export-bar>div{min-width:180px}.export-bar>div span{font-size:12px}.export-bar button{font-size:13px}.export-bar label{font-size:12px}
+.metrics{margin-bottom:20px}.report-present:not(.tab-overview) .metrics{display:flex;gap:0;border:1px solid var(--border);border-radius:8px;margin-bottom:16px;flex-wrap:wrap}
+.report-present:not(.tab-overview) .metric{flex:1;flex-direction:row;align-items:baseline;gap:10px;border:0;border-right:1px solid var(--border);border-radius:0;padding:10px 14px;background:transparent}
+.report-present:not(.tab-overview) .metric:last-child{border-right:0}.report-present:not(.tab-overview) .metric>strong{font-size:19px;white-space:nowrap;margin:0}.report-present:not(.tab-overview) .metric>span{font-size:12px}.report-present:not(.tab-overview) .metric small{display:none}
+.workspace-grid{grid-template-columns:minmax(0,1fr) 360px}.detail{top:calc(var(--report-toolbar-height,120px) + 12px);max-height:calc(100dvh - var(--report-toolbar-height,120px) - 24px);padding:20px}.detail .section-heading{position:sticky;top:-20px;background:var(--panel);padding:10px 0;z-index:1}.detail details{margin-top:18px}.detail summary{font-weight:600}
+.finding-button{min-width:170px}.finding-button strong{font-size:14px}.finding-button>span{max-width:100%}.project-cell{font-size:13px;max-width:130px}td{padding:14px 12px}th{font-size:12px}.number small{font-size:12px}.return-findings{margin:0 16px 12px}
+@media(max-width:1250px){.report-present main{padding:18px}.report-present .scope-top{flex-wrap:wrap}.scope-top .muted{max-width:none}.workspace-grid{grid-template-columns:minmax(0,1fr) 330px}.report-present:not(.tab-overview) .metric{padding:8px 10px;gap:8px}.report-present:not(.tab-overview) .metric>strong{font-size:17px}.finding-button{min-width:145px}}
+@media(max-width:1000px){.workspace-grid{grid-template-columns:1fr}.report-present .scope-top{flex-wrap:nowrap}.report-present .scope-actions{gap:8px}.report-present .scope-actions .text-button{font-size:12px}.metrics{grid-template-columns:repeat(2,minmax(0,1fr))}.export-bar>div{display:none}.report-present:not(.tab-overview) .metric{min-width:0}.report-present:not(.tab-overview) .metric>span{font-size:12px}}

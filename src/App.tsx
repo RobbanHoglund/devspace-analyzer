@@ -33,6 +33,8 @@ function Icon({ name }: { name: string }) {
 function Badge({ risk }: { risk: Risk }) { return <span className={`badge risk-${risk}`}>{risk === 'protected' ? '◈ ' : '• '}{labels[risk]}</span>; }
 
 export default function App() {
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [scopeExpanded, setScopeExpanded] = useState(false);
   const detailRef = useRef<HTMLElement>(null);
   const [roots, setRoots] = useState<string[]>(() => readPreference('devspace.roots').slice(0, 32));
   const [protectedPaths, setProtectedPaths] = useState<string[]>(() => readPreference('devspace.protected'));
@@ -88,6 +90,11 @@ export default function App() {
     return () => cancelAnimationFrame(frame);
   }, [tab]);
 
+  useEffect(() => {
+    const element = toolbarRef.current; if (!element) return;
+    const observer = new ResizeObserver(() => document.documentElement.style.setProperty('--report-toolbar-height', `${element.getBoundingClientRect().height}px`));
+    observer.observe(element); return () => observer.disconnect();
+  }, [report]);
   const scopeChanged = origin === 'native' && !!reportScope && scopeKey(reportScope) !== scopeKey({roots, includeCaches});
   const findings = report?.findings ?? [];
   const summary = useMemo(() => summarize(findings, activeProtected), [findings, activeProtected]);
@@ -141,6 +148,7 @@ export default function App() {
     try {
       const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
       savedSession.current = null; previousFindings.current = null; setCanReturnToFindings(false); scrollPositions.current = {}; setPage(0);
+      setScopeExpanded(false);
       setReportScope({roots: [...roots], includeCaches});
       requestAnimationFrame(() => window.scrollTo({top:0}));
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
@@ -229,7 +237,7 @@ export default function App() {
     </>}
   </aside>;
 
-  return <div className="app-shell">
+  return <div className={`app-shell ${report ? "report-present" : ""} tab-${tab}`}>
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark"><Icon name="grid"/></span><div>DevSpace<small>ANALYZER</small></div></div>
       <div className="nav-label">WORKSPACE INTELLIGENCE</div>
@@ -237,21 +245,25 @@ export default function App() {
       <div className="sidebar-bottom"><div className="local-indicator">Local only</div><p>No account. No telemetry.<br/>No automatic cleanup.</p><span className="version">PILOT 0.1.1</span></div>
     </aside>
     <main>
-      <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
+      <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{report ? ({overview:'Overview',findings:'Findings',projects:'Projects',coverage:'Scan coverage'}[tab]) : tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
       {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available only in the desktop application.</div>}
       {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={exitDemo}>Exit demo</button></div>}
       {previousReport && report && <div className="notice-banner" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
       <section className="scope panel" aria-label="Scan configuration">
-        <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>
+        {report ? <div className="scope-top"><div><strong>Next scan</strong><span className="muted">{roots.length} workspace {roots.length === 1 ? 'folder' : 'folders'} · Shared caches {includeCaches ? 'included' : 'excluded'}</span></div><div className="scope-actions"><button aria-expanded={scopeExpanded} aria-controls="scan-settings" onClick={() => setScopeExpanded(value => !value)}>Scan settings</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div></div> : <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>}
+        <div id="scan-settings" hidden={!!report && !scopeExpanded}>
+        {report && <button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button>}
         <div className="root-list">{roots.map(root => <span className="root-chip" key={root} title={root}><Icon name="folder"/><span>{visiblePath(root)}</span><button disabled={busy} aria-label={`Remove ${root}`} onClick={() => setRoots(old => old.filter(p => p !== root))}>×</button></span>)}</div>
-        <div className="scope-options"><form onSubmit={e => { e.preventDefault(); addManual(); }}><input aria-label="Add folder path" value={manualRoot} onChange={e => setManualRoot(e.target.value)} placeholder="Or enter a folder path, e.g. C:\\Workspaces" disabled={busy}/><button disabled={busy || !manualRoot.trim()} type="submit">Add</button></form><label><input type="checkbox" checked={includeCaches} disabled={busy} onChange={e => setIncludeCaches(e.target.checked)}/>Include known shared caches</label><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div>
+        <div className="scope-options"><form onSubmit={e => { e.preventDefault(); addManual(); }}><input aria-label="Add folder path" value={manualRoot} onChange={e => setManualRoot(e.target.value)} placeholder="Or enter a folder path, e.g. C:\\Workspaces" disabled={busy}/><button disabled={busy || !manualRoot.trim()} type="submit">Add</button></form><label><input type="checkbox" checked={includeCaches} disabled={busy} onChange={e => setIncludeCaches(e.target.checked)}/>Include known shared caches</label>{!report && <button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button>}</div>
+        </div>
         {scopeChanged && <p className="scope-change" role="status">Settings changed — scan again to update results. The current report still describes its original scope.</p>}
         {busy && <div className="scan-progress" role="status"><div className="progress-track"><span/></div><div><strong>{cancelling ? 'Cancelling at the next filesystem boundary…' : `Scanning · ${progress.files.toLocaleString()} files · ${bytes(progress.logicalBytes)}`}</strong><button onClick={cancel} disabled={cancelling}>Cancel scan</button></div><span className="mono muted">{visiblePath(progress.currentPath)}</span></div>}
       </section>
 
       {!report ? <section className="welcome panel"><div className="welcome-icon"><Icon name="scan"/></div><span className="eyebrow">LESS GUESSWORK. MORE CONTEXT.</span><h2>Find the weight in your development workspace.</h2><p>Understand Gradle and Maven storage, Node dependencies and Python environments — with explicit evidence, recovery notes and protected data.</p><div className="welcome-steps"><div><b>01</b><strong>Choose your scope</strong><span>Start with your checked-out repositories and shared caches.</span></div><div><b>02</b><strong>Inspect the findings</strong><span>Compare categories, projects and likely recovery costs.</span></div><div><b>03</b><strong>Make an informed decision</strong><span>Export your analysis. This pilot cannot delete anything.</span></div></div><button onClick={loadDemo} disabled={busy}>Explore demo data<Icon name="arrow"/></button></section> : <>
+        <div ref={toolbarRef} className="report-toolbar"><div className="report-bar"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.progress.files.toLocaleString()} files · {bytes(report.progress.logicalBytes)} measured · {(report.durationMs / 1000).toFixed(1)} s</span><button className="text-button" onClick={() => setTab('coverage')}>{report.cancelled ? 'Cancelled · partial results' : report.complete ? 'Completed within scope' : `${report.warningCount} coverage warning${report.warningCount === 1 ? '' : 's'}`}</button></div><footer className="export-bar panel"><div><strong>Your analysis stays local.</strong><span>No cleanup has been performed. Exports can contain sensitive path metadata.</span></div><label><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/>Redacted summary</label><button onClick={() => exportReport('md')} disabled={exporting}><Icon name="download"/>Markdown</button><button onClick={() => exportReport('json')} disabled={exporting}><Icon name="download"/>Export JSON</button></footer></div>
         <section className="metrics" aria-label="Scan summary"><div className="metric panel"><span>Identified developer data</span><strong>{bytes(summary.identified)}</strong><small>{findings.length.toLocaleString()} classified findings</small></div><div className="metric panel accent"><span>Review candidates</span><strong>{bytes(summary.candidates)}</strong><small>Logical size · not guaranteed savings</small></div><div className="metric panel"><span>Protected data</span><strong>{bytes(summary.protected)}</strong><small>Unique data or personal protection</small></div><div className="metric panel"><span>Projects in scope</span><strong>{report.projects.length}</strong><small>{report.roots.length} effective scan roots</small></div></section>
-        <div className="report-bar"><span>{origin === 'demo' ? 'Synthetic example' : new Date(report.startedAt * 1000).toLocaleString('en-GB')} · {report.progress.files.toLocaleString()} files · {bytes(report.progress.logicalBytes)} measured · {(report.durationMs / 1000).toFixed(1)} s</span><button className="text-button" onClick={() => setTab('coverage')}>{report.cancelled ? 'Cancelled · partial results' : report.complete ? 'Completed within scope' : `${report.warningCount} coverage warning${report.warningCount === 1 ? '' : 's'}`}</button></div>
+
 
         {tab === 'overview' && <>
           <div className="overview-grid"><section className="panel chart-panel"><div className="section-heading"><h2>Where the space is</h2><span className="muted">Classified logical bytes</span></div><div className="treemap" aria-label="Storage by ecosystem">{treemap(groups).map(tile => <button key={tile.name} className={`tile eco-${tile.name}`} title={`${tile.name}: ${bytes(tile.value)}`} style={{ left: `${tile.x / 9.6}%`, top: `${tile.y / 2.4}%`, width: `${tile.w / 9.6}%`, height: `${tile.h / 2.4}%` }} onClick={() => { clearFilters(); setEco(tile.name); setTab('findings'); }}><strong>{tile.name}</strong>{tile.w > 110 && tile.h > 65 && <><span>{bytes(tile.value)}</span><small>{(tile.value / Math.max(summary.identified, 1) * 100).toFixed(1)}%</small></>}</button>)}{groups.length === 0 && <p>No recognized developer data found in this scope.</p>}</div><div className="chart-legend">{groups.map(g => <span key={g.name}><i className={`dot eco-${g.name}`}/>{g.name}</span>)}</div></section>
@@ -265,7 +277,7 @@ export default function App() {
 
         {tab === 'coverage' && <div className="coverage-grid"><section className="panel"><div className="section-heading"><h2>What was scanned</h2><Badge risk={report.complete ? 'low' : 'review'}/></div><h3>Effective roots</h3><ul className="path-list">{report.roots.map(p => <li key={p} className="mono">{visiblePath(p)}</li>)}</ul><h3>Recognized cache locations overlapping scope</h3>{report.globalCaches.map((c, i) => <div className="cache-location" key={i}><strong>{c.ecosystem} · {c.kind}</strong><span className="mono">{visiblePath(c.path)}</span><small>{c.source}</small></div>)}<p className="tiny muted">Only effective roots above were traversed. A recognized cache may enclose a selected subdirectory. Defaults are not verified by running a package manager; custom/project configurations may place data elsewhere.</p></section><section className="panel"><h2>Limits & skipped entries</h2><ul className="limitations">{report.limitations.map((s, i) => <li key={i}>{s}</li>)}</ul><h3>Warnings ({report.warningCount.toLocaleString()})</h3><div className="warning-list">{report.warnings.map((w, i) => <div className="warning-item" key={i}><strong>{w.code}</strong><span className="mono">{visiblePath(w.path)}</span><p>{w.message}</p></div>)}{!report.warnings.length && <p>No skipped-entry warnings were recorded.</p>}</div>{report.warningCount > report.warnings.length && <p>Only the first {report.warnings.length} warning details are retained.</p>}</section></div>}
 
-        <footer className="export-bar panel"><div><strong>Your analysis stays local.</strong><span>No cleanup has been performed. Exports can contain sensitive path metadata.</span></div><label><input type="checkbox" checked={redact} onChange={e => setRedact(e.target.checked)}/>Redacted summary</label><button onClick={() => exportReport('md')} disabled={exporting}><Icon name="download"/>Markdown</button><button onClick={() => exportReport('json')} disabled={exporting}><Icon name="download"/>Export JSON</button></footer>
+
       </>}
       {(error || notice) && <div className="feedback-region" aria-label="Notifications">
         {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
