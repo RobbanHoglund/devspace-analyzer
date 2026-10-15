@@ -11,6 +11,19 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         if name.eq_ignore_ascii_case(".git") {
             return Some(Rule::new("Git metadata", "Git", "git-metadata", "protected", "Contains history, references or a worktree pointer. Not a build cache.", "Use Git's own repository maintenance after a backup; never delete this as cleanup.", vec!["Git repository/worktree marker".into()]));
         }
+        // Safety boundaries must not depend on project inventory: aggregates
+        // intentionally do not register every dependency manifest as a project.
+        // These names can only add protection, never establish a cleanup candidate.
+        if directory && name == ".yarn" {
+            return Some(Rule::new("Project Yarn storage", "Node", "yarn-project", "protected", "May include tracked Zero-Install packages, patches, releases and plugins, not just cache.", "Review the Yarn project configuration and tracked files individually.", vec!["Directory named .yarn; protected independently of project discovery".into()]));
+        }
+        if directory && [".venv", "venv"].contains(&name.as_ref()) && !regular(&path.join("pyvenv.cfg")) {
+            return Some(Rule::new("Python virtual environment", "Python", "python-venv", "protected", "This conventional environment directory has no regular pyvenv.cfg. It may contain unique data rather than a recoverable environment.", "Inspect and preserve the contents before considering any changes.", vec!["Environment directory name without a regular pyvenv.cfg".into()]));
+        }
+        let bytecode_sources = (directory && name == "__pycache__").then(|| bytecode_sources_present(path));
+        if bytecode_sources == Some(false) {
+            return Some(Rule::new("Python bytecode cache", "Python", "python-bytecode", "protected", "Bytecode recovery could not be established for every entry; source files may be absent or the directory may contain other data.", "Preserve the directory until every entry has a verified source and recovery path.", vec!["Incomplete bytecode recovery evidence; protected independently of project discovery".into()]));
+        }
         let protected_cache = |g: &&CacheLocation| matches!(g.kind.as_str(), "maven-repository" | "toolchains" | "virtual-disks") && within(path, Path::new(&g.path));
         let exact = self.report.global_caches.iter().find(protected_cache).or_else(|| self.report.global_caches.iter().find(|g| key(Path::new(&g.path)) == key(path)));
         if let Some(cache) = exact {
@@ -47,8 +60,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         let evidence = vec![format!("Project markers: {}", p.markers.join(", ")), if p.lockfiles.is_empty() { "No recognized lockfile in this project directory".into() } else { format!("Lockfiles present: {} (not validated)", p.lockfiles.join(", ")) }];
         if !directory { return None; }
         if name == "__pycache__" && has("Python") {
-            let matched = bytecode_sources_present(path);
-            return Some(Rule::new("Python bytecode cache", "Python", "python-bytecode", if matched { "low" } else { "protected" }, if matched { "Only .pyc filenames were found and each has a matching .py source filename in the parent directory. Sources were not executed or read." } else { "Bytecode recovery could not be established for every entry; source files may be absent or the directory may contain other data." }, "Python normally regenerates bytecode from source. Verify that sources and the required interpreter are available.", evidence));
+            return Some(Rule::new("Python bytecode cache", "Python", "python-bytecode", "low", "Only .pyc filenames were found and each has a matching .py source filename in the parent directory. Sources were not executed or read.", "Python normally regenerates bytecode from source. Verify that sources and the required interpreter are available.", evidence));
         }
         if !direct { return None; }
         if has("Gradle") && ["build", ".gradle"].contains(&name.as_ref()) {
@@ -61,11 +73,8 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             let modules = name == "node_modules";
             return Some(Rule::new(if modules { "Installed Node dependencies" } else { "Possible Node build artifacts" }, "Node", if modules { "node-modules" } else { "node-output" }, "review", if modules { "Installed dependencies next to package.json. Lockfiles help but do not prove recovery of local packages, patches, install scripts or unpublished versions." } else { "Conventional build/cache directory next to package.json. Directory naming alone does not establish that every file is disposable." }, "Check the lockfile, local/file dependencies, package availability and any manual patches before reinstalling or rebuilding.", evidence));
         }
-        if has("Node") && name == ".yarn" {
-            return Some(Rule::new("Project Yarn storage", "Node", "yarn-project", "protected", "May include tracked Zero-Install packages, patches, releases and plugins, not just cache.", "Review the Yarn project configuration and tracked files individually.", evidence));
-        }
         if has("Python") && [".venv", "venv"].contains(&name.as_ref()) {
-            return Some(Rule::new("Python virtual environment", "Python", "python-venv", if regular(&path.join("pyvenv.cfg")) { "review" } else { "protected" }, "A virtual environment may contain manually installed or editable local packages. A manifest/lockfile is not a complete recovery guarantee.", "Record the interpreter and package origins, check local/editable dependencies, then rebuild from a verified lock or requirements file.", evidence));
+            return Some(Rule::new("Python virtual environment", "Python", "python-venv", "review", "A virtual environment may contain manually installed or editable local packages. A manifest/lockfile is not a complete recovery guarantee.", "Record the interpreter and package origins, check local/editable dependencies, then rebuild from a verified lock or requirements file.", evidence));
         }
         if has("Python") && [".pytest_cache", ".mypy_cache", ".ruff_cache"].contains(&name.as_ref()) {
             return Some(Rule::new("Python tooling cache", "Python", "python-tool-cache", "review", "Conventional tool cache next to a Python project. Tracking and unique files have not been verified.", "The owning tool usually rebuilds its cache; review the directory and close running jobs first.", evidence));

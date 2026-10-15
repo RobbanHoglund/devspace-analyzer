@@ -20,6 +20,8 @@ A directory called `build` or `node_modules` outside a detected project is not e
 
 Maven local repositories can contain locally installed artifacts. Python virtual environments can contain editable or manually installed dependencies. Yarn project directories can include tracked Zero-Install data, patches, plugins and releases. Virtual disks can contain persistent data. These distinctions are reflected in the findings and warnings.
 
+Yarn `.yarn` directories, unrecognized `venv`/`.venv` directories and `__pycache__` directories without complete source evidence are conservative protection boundaries even without a discovered project. These boundaries also protect an enclosing build/cache aggregate. This can protect an unrelated directory with one of these names; it never makes a name alone sufficient evidence for a cleanup candidate. Dependency manifests inside an aggregate still do not create additional project inventory or duplicate byte accounting.
+
 ## Filesystem scope
 
 Overlapping selected roots and shared-cache locations are collapsed to an effective union. Aggregate findings stop further classification below that finding, preventing parent/child finding sums from double counting. Nested projects own their own bytes rather than charging them to every ancestor project.
