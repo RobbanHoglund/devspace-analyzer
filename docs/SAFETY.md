@@ -12,6 +12,8 @@ Operating-system access timestamps and external software can still change while 
 
 ## Classification is conservative
 
+Protected aggregate findings retain up to 20 sorted protected-location paths and a total boundary count, exposed in finding details and full JSON reports. Nested locations already covered by a protected parent are omitted from this list. The aggregate is still counted once. Redacted reports withhold these paths and labels while retaining the count.
+
 There are three assessments:
 
 - **Lower risk:** stronger, narrow recovery evidence. Currently used only for recognized CPython tagged bytecode filenames where each observed `.pyc` has its exact corresponding source filename and no unrelated entry was found. Dotted source stems are preserved, including optional optimization tags. Unknown, legacy or malformed cache names remain protected. This is not an unconditional deletion approval.
@@ -25,6 +27,10 @@ Maven local repositories can contain locally installed artifacts. Python virtual
 Yarn `.yarn` directories, unrecognized `venv`/`.venv` directories and `__pycache__` directories without complete source evidence are conservative protection boundaries even without a discovered project. These boundaries also protect an enclosing build/cache aggregate. This can protect an unrelated directory with one of these names; it never makes a name alone sufficient evidence for a cleanup candidate. Dependency manifests inside an aggregate still do not create additional project inventory or duplicate byte accounting.
 
 ## Filesystem scope
+
+Selecting a subtree preserves intrinsic protection from enclosing storage, including Yarn, Git metadata, unrecognized environments and protected shared-cache categories. Ancestor context is checked up to 128 levels without measuring siblings. Selecting a descendant of a policy-excluded directory still excludes it; unresolved ancestor depth stops that root with a coverage warning.
+
+Bounded allowlisted ancestor markers also preserve project and storage context for directly selected artifact directories and their subtrees. The first enclosing storage boundary takes precedence over installed-package manifests. A parent project used only for context is marked `contextOnly`; its owned/artifact totals include only files measured inside effective roots. Context probes never add sibling files to the scan or execute project code.
 
 Overlapping selected roots and shared-cache locations are collapsed to an effective union. Aggregate findings stop further classification below that finding, preventing parent/child finding sums from double counting. Nested projects own their own bytes rather than charging them to every ancestor project.
 
@@ -42,11 +48,17 @@ All sizes are **logical file lengths**. A hardlinked file encountered at two dif
 
 ## Configuration reads
 
+Gradle settings support bounded, literal top-level `include 'api', ':lib:core'` and `include("api", ":lib:core")` declarations, including intermediate projects. This identifies conventional output for modules whose build rules are in the root project. Comments and strings are lexed without execution. Dynamic declarations produce `gradle-settings` warnings; directory/build-file remapping and applied settings scripts disable inferred paths. Names containing traversal, separators or interpolation are rejected. Only existing in-scope directories are visited, and the normal link and protection checks still apply.
+
 The scanner may read bounded, known configuration files for specific fields: npm user cache/store settings, Maven user `localRepository`, Gradle wrapper `distributionUrl`, Git `HEAD` when `.git` is a directory, and the package.json workspace marker. Raw configuration contents are not copied into reports. Secrets on unrelated lines of a configuration file are not intentionally extracted or displayed.
 
 No source file contents, `.env` values, package scripts, wrapper executables, virtual-disk contents or arbitrary file previews are opened. Most project markers and lockfiles are detected by filename and metadata only. Variable substitution is bounded to avoid cyclic expansion.
 
 ## Report privacy
+
+Full Markdown exports include scope, project ownership in scope, per-finding reasons/evidence/recovery/caveats, retained protected locations, wrapper context and coverage-warning details. The default redacted Markdown remains a restricted summary and applies redaction at the formatting boundary as well as in the UI. Partial measurements and effective personal protection remain explicit in both formats.
+
+A previous report remains inspectable and exportable while a new scan runs or fails, with an explicit previous-report notice. Its native/demo provenance is preserved. Successful scans, including cancelled scans with partial results, replace it. Folder reveal is disabled during scanning to avoid mixing finding IDs between native reports.
 
 Full reports contain absolute paths, project names, branch names, timestamps and configuration-location provenance. Those can reveal usernames, customer names or internal project details. Treat a full export as potentially sensitive.
 

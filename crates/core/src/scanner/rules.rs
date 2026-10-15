@@ -2,6 +2,9 @@ use super::*;
 
 impl<F: FnMut(Progress)> Scanner<'_, F> {
     pub(super) fn rule(&self, path: &Path, owner: Option<usize>, directory: bool) -> Option<Rule> {
+        self.rule_with_project(path, owner.map(|i| &self.report.projects[i]), directory)
+    }
+    pub(super) fn rule_with_project(&self, path: &Path, project: Option<&Project>, directory: bool) -> Option<Rule> {
         let name = path.file_name()?.to_string_lossy();
         // These intrinsic protected types take precedence over a configured
         // cache alias and also work when explicitly selected without a project.
@@ -53,8 +56,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
                 return Some(Rule::new(label, "Node", "npm-cache", if ["_cacache", "_npx", "_logs"].contains(&name.as_ref()) { "review" } else { "protected" }, "Storage under the configured npm cache. npx environments, package content and diagnostic logs have different recovery costs.", "Review with npm's own cache tools. Even npm cache verify can change the cache; this scanner never runs it.", evidence));
             }
         }
-        let owner = owner?;
-        let p = &self.report.projects[owner];
+        let p = project?;
         let direct = path.parent().is_some_and(|parent| key(parent) == key(Path::new(&p.path)));
         let has = |ecosystem: &str| p.ecosystems.iter().any(|e| e == ecosystem);
         let evidence = vec![format!("Project markers: {}", p.markers.join(", ")), if p.lockfiles.is_empty() { "No recognized lockfile in this project directory".into() } else { format!("Lockfiles present: {} (not validated)", p.lockfiles.join(", ")) }];

@@ -36,7 +36,14 @@ pub struct Finding {
     pub user_protected: bool,
     pub wrapper_version: Option<String>,
     pub wrapper_references: Vec<String>,
+    #[serde(default)]
+    pub protected_descendants: Vec<ProtectedLocation>,
+    #[serde(default)]
+    pub protected_descendant_count: u64,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProtectedLocation { pub path: String, pub label: String }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,6 +58,9 @@ pub struct Project {
     pub branch: Option<String>,
     pub wrapper_version: Option<String>,
     pub workspace: bool,
+    /// Metadata from outside the selected roots; byte totals remain in-scope only.
+    #[serde(default)]
+    pub context_only: bool,
     pub owned_logical_bytes: u64,
     pub artifact_bytes: u64,
 }

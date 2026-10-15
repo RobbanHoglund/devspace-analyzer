@@ -76,13 +76,14 @@ export function redactedReport(report: Report): Report {
     schemaVersion: report.schemaVersion, startedAt: report.startedAt, durationMs: report.durationMs,
     roots: report.roots.map((_, i) => `[scope-${i + 1}]`),
     globalCaches: report.globalCaches.map((c, i) => ({ path: `[cache-${i + 1}]`, ecosystem: safeEco(c.ecosystem), kind: 'shared-storage', source: 'Location source withheld' })),
-    projects: report.projects.map((p, i) => ({ id: `p${i}`, name: `Project ${i + 1}`, path: `[project-${i + 1}]`, ecosystems: p.ecosystems.map(safeEco), markers: [], lockfiles: [], gitKind: p.gitKind === 'worktree' ? 'worktree' : p.gitKind === 'repository' ? 'repository' : null, branch: null, wrapperVersion: null, workspace: p.workspace, ownedLogicalBytes: p.ownedLogicalBytes, artifactBytes: p.artifactBytes })),
+    projects: report.projects.map((p, i) => ({ id: `p${i}`, name: `Project ${i + 1}`, path: `[project-${i + 1}]`, ecosystems: p.ecosystems.map(safeEco), markers: [], lockfiles: [], gitKind: p.gitKind === 'worktree' ? 'worktree' : p.gitKind === 'repository' ? 'repository' : null, branch: null, wrapperVersion: null, workspace: p.workspace, contextOnly: p.contextOnly, ownedLogicalBytes: p.ownedLogicalBytes, artifactBytes: p.artifactBytes })),
     findings: report.findings.map((f, i) => ({
       id: `f${i}`, path: `[finding-${i + 1}]`, label: `${safeEco(f.ecosystem)} storage ${i + 1}`, ecosystem: safeEco(f.ecosystem), kind: 'classified-storage',
       risk: ['low', 'review', 'protected'].includes(f.risk) ? f.risk : 'protected', confidence: 'See local report',
       logicalBytes: f.logicalBytes, files: f.files, latestModified: f.latestModified, projectId: f.projectId ? projects.get(f.projectId) ?? null : null,
       evidence: ['Detailed evidence withheld from the redacted summary.'], reason: 'Inspect the local application for the category-specific analysis.', recovery: 'Review the local recovery notes before considering changes.', caveats: ['No guaranteed physical-space saving is claimed.'],
-      complete: f.complete, userProtected: f.userProtected, wrapperVersion: null, wrapperReferences: f.wrapperReferences.map(id => projects.get(id)).filter((id): id is string => !!id)
+      complete: f.complete, userProtected: f.userProtected, wrapperVersion: null, wrapperReferences: f.wrapperReferences.map(id => projects.get(id)).filter((id): id is string => !!id),
+      protectedDescendants: [], protectedDescendantCount: f.protectedDescendantCount ?? 0,
     })),
     progress: { ...report.progress, currentPath: '[withheld]' },
     warnings: report.warnings.map((_, i) => ({ path: `[warning-${i + 1}]`, code: 'withheld', message: 'Inspect this warning in the local application.' })),
@@ -92,22 +93,92 @@ export function redactedReport(report: Report): Report {
   };
 }
 function markdownText(value: string) { return value.replace(/[\\`*_{}\[\]<>#!|]/g, '\\$&').replace(/[\r\n]/g, ' '); }
-export function markdownReport(report: Report, origin: 'native' | 'demo'): string {
-  const rows = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes).map(f => {
+export function markdownReport(report: Report, origin: 'native' | 'demo', redacted = false): string {
+  // Keep this boundary defensive even if the caller already redacted the data.
+  if (redacted) report = redactedReport(report);
+  const findings = report.findings.slice().sort((a, b) => b.logicalBytes - a.logicalBytes);
+  const rows = findings.map(f => {
     const risk = f.userProtected ? 'protected' : f.risk;
     const size = `${bytes(f.logicalBytes)}${f.complete ? '' : ' (partial)'}`;
     const candidate = f.complete && risk !== 'protected';
     return `| ${markdownText(f.label)} | ${size} | ${f.complete ? 'Complete' : 'Partial'} | ${risk} | ${candidate ? 'Yes' : 'No'} | ${markdownText(f.path)} |`;
   });
+  const list = (items: string[]) => items.length ? items.map(s => `- ${markdownText(s)}`).join('\n') : '- None recorded.';
+  const projectName = (id: string | null) => report.projects.find(p => p.id === id)?.name ?? 'Shared / global';
+  const detail = redacted ? '' : `
+## Scope
+
+${list(report.roots)}
+
+Only files within these effective roots were measured. Parent project context does not expand the measurement scope.
+
+### Recognized shared caches
+
+${list(report.globalCaches.map(c => `${c.ecosystem} / ${c.kind}: ${c.path} — ${c.source}`))}
+
+## Projects
+
+| Project | Path | Ecosystems | Owned logical size in scope | Identified artifacts | Context |
+|---|---|---|---:|---:|---|
+${report.projects.map(p => `| ${markdownText(p.name)} | ${markdownText(p.path)} | ${markdownText(p.ecosystems.join(', '))} | ${bytes(p.ownedLogicalBytes)} | ${bytes(p.artifactBytes)} | ${p.contextOnly ? 'Parent context; selected scope only' : 'Discovered in scope'} |`).join('\n')}
+
+${report.projects.map(p => `### ${markdownText(p.name)}
+
+Project markers: ${markdownText(p.markers.join(', ') || 'None recorded')}.
+
+Lockfile markers: ${markdownText(p.lockfiles.join(', ') || 'None recognized')}. Reproducibility has not been verified.
+
+Git: ${markdownText(p.gitKind ?? 'No Git marker')}${p.branch ? `; branch ${markdownText(p.branch)}` : ''}. Other branches and working-tree state were not evaluated.
+
+Gradle wrapper: ${markdownText(p.wrapperVersion ?? 'None detected')}. Workspace marker: ${p.workspace ? 'Yes' : 'No'}.
+`).join('\n')}
+
+## Finding analysis
+
+${findings.map((f, i) => `### ${i + 1}. ${markdownText(f.label)}
+
+Path: ${markdownText(f.path)}
+
+Project: ${markdownText(projectName(f.projectId))}
+
+Assessment: ${f.userProtected ? 'protected (personal preference)' : f.risk}. Measurement: ${f.complete ? 'Complete' : 'Partial; measured files only'}.
+
+Category: ${markdownText(f.kind)}. Confidence: ${markdownText(f.confidence)}. Files measured: ${f.files}. Logical size: ${bytes(f.logicalBytes)}.
+
+**What this means**
+
+${markdownText(f.reason)}
+
+**Evidence**
+
+${list(f.evidence)}
+
+**Recovery and trade-offs**
+
+${markdownText(f.recovery)}
+
+**Limits of this recommendation**
+
+${list(f.caveats)}
+${f.wrapperVersion ? `\nGradle wrapper: ${markdownText(f.wrapperVersion)}. Discovered references: ${markdownText(f.wrapperReferences.map(projectName).join(', ') || 'None in this scan; not proof of disuse')}.\n` : ''}
+${f.latestModified !== null ? `\nLatest file modification: ${new Date(f.latestModified * 1000).toISOString()}. Not a last-use date.\n` : ''}
+${f.protectedDescendantCount ? `\n**Protected locations**\n\nShowing ${f.protectedDescendants?.length ?? 0} of ${f.protectedDescendantCount} protected locations; nested locations covered by a protected parent are omitted.\n\n${list((f.protectedDescendants ?? []).map(p => `${p.label}: ${p.path}`))}\n` : ''}`).join('\n')}
+## Coverage warnings
+
+${list(report.warnings.map(w => `${w.code}: ${w.path} — ${w.message}`))}
+${report.warningCount > report.warnings.length ? `\nOnly ${report.warnings.length} of ${report.warningCount} warning details were retained.\n` : ''}
+`;
   return `# DevSpace Analyzer report
 
 Origin: ${origin === 'demo' ? 'DEMO — synthetic data, not this computer' : 'Local native scan'}
+
+Detail level: ${redacted ? 'Redacted summary' : 'Full report'}
 
 Scan: ${new Date(report.startedAt * 1000).toISOString()}
 
 Status: ${report.cancelled ? 'Cancelled; partial results' : report.complete ? 'Completed within scope' : 'Partial coverage; review warnings'}
 
-${report.sizeBasis}
+${markdownText(report.sizeBasis)}
 
 Files measured: ${report.progress.files}
 
@@ -120,6 +191,7 @@ Partial sizes include only the files measured, not unread or skipped entries. In
 | Finding | Logical size | Measurement | Risk | Review candidate | Path |
 |---|---:|---|---|---|---|
 ${rows.join('\n')}
+${detail}
 
 ## Limitations
 
