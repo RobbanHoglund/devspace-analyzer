@@ -69,6 +69,21 @@ fn project(root: &Path, index: usize) -> Option<Project> {
         git_kind, branch, wrapper_version: wrapper_version(root), workspace, owned_logical_bytes: 0, artifact_bytes: 0,
     })
 }
+/// Interpret only CPython's tagged cache filenames. Strip the suffix from the
+/// right so a dotted source stem stays intact; unknown formats are protected.
+fn bytecode_source_name(name: &str) -> Option<String> {
+    let cached = name.strip_suffix(".pyc")?;
+    let (stem, tag) = cached.rsplit_once(".cpython-")?;
+    if stem.is_empty() { return None; }
+    let version = if let Some((version, optimization)) = tag.split_once(".opt-") {
+        if optimization.is_empty() || !optimization.chars().all(|c| c.is_ascii_alphanumeric()) { return None; }
+        version
+    } else { tag };
+    let digits = version.strip_suffix('t').unwrap_or(version);
+    if digits.is_empty() || !digits.chars().all(|c| c.is_ascii_digit()) { return None; }
+    Some(format!("{stem}.py"))
+}
+
 fn bytecode_sources_present(path: &Path) -> bool {
     let Some(parent) = path.parent() else { return false; };
     let Ok(entries) = fs::read_dir(path) else { return false; };
@@ -78,8 +93,9 @@ fn bytecode_sources_present(path: &Path) -> bool {
         let Ok(entry) = item else { return false; };
         let p = entry.path();
         if !regular(&p) || p.extension().and_then(|e| e.to_str()) != Some("pyc") { return false; }
-        let name = entry.file_name().to_string_lossy().into_owned();
-        if !regular(&parent.join(format!("{}.py", name.split('.').next().unwrap_or("")))) { return false; }
+        let name = entry.file_name();
+        let Some(source) = name.to_str().and_then(bytecode_source_name) else { return false; };
+        if !regular(&parent.join(source)) { return false; }
         found = true;
     }
     found

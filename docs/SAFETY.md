@@ -6,19 +6,23 @@ The scanner uses directory enumeration, metadata and a bounded set of configurat
 
 The desktop shell stores its own local preferences. Scanner validation of personal protection accepts existing local directories. Files, missing paths, links and other rejected inputs produce `invalid-protection` coverage warnings without dropping valid protection entries or blocking the scan. The UI retains saved preferences conservatively; these warnings do not remove preferences or override intrinsic protection. **Open folder** starts the operating system file manager for a finding in the latest native scan. **Export** opens a native save dialog and creates a new `.json` or `.md` file; existing files are never overwritten. An interrupted export may leave an incomplete newly created report. These explicit actions are separate from scanning.
 
+Removing a finding's personal protection removes only its exact saved path rule. Protection inherited from a saved parent, or caused by a protected child, is shown separately with the saved path and the number of affected findings in the current report. Removing such a rule requires reviewing its scope and explicitly choosing to remove it for all covered paths; independent rules and intrinsic protection remain. Paths outside the current report may also be covered by the rule.
+
 Operating-system access timestamps and external software can still change while files are read. The read-only claim does not mean the complete operating system remains bit-for-bit unchanged.
 
 ## Classification is conservative
 
 There are three assessments:
 
-- **Lower risk:** stronger, narrow recovery evidence. Currently used only for Python bytecode where each observed `.pyc` has a corresponding source filename and no unrelated entry was found. This is not an unconditional deletion approval.
+- **Lower risk:** stronger, narrow recovery evidence. Currently used only for recognized CPython tagged bytecode filenames where each observed `.pyc` has its exact corresponding source filename and no unrelated entry was found. Dotted source stems are preserved, including optional optimization tags. Unknown, legacy or malformed cache names remain protected. This is not an unconditional deletion approval.
 - **Needs review:** conventional build/dependency/cache data with unresolved recovery conditions.
 - **Protected:** possibly unique data, unknown storage under a known root, or a personal protection preference.
 
 A directory called `build` or `node_modules` outside a detected project is not enough to create a cleanup recommendation. Within a detected project, names still do not prove that every contained file is disposable. The scanner does not establish Git tracking/dirty state or validate lockfile contents.
 
 Maven local repositories can contain locally installed artifacts. Python virtual environments can contain editable or manually installed dependencies. Yarn project directories can include tracked Zero-Install data, patches, plugins and releases. Virtual disks can contain persistent data. These distinctions are reflected in the findings and warnings.
+
+Yarn `.yarn` directories, unrecognized `venv`/`.venv` directories and `__pycache__` directories without complete source evidence are conservative protection boundaries even without a discovered project. These boundaries also protect an enclosing build/cache aggregate. This can protect an unrelated directory with one of these names; it never makes a name alone sufficient evidence for a cleanup candidate. Dependency manifests inside an aggregate still do not create additional project inventory or duplicate byte accounting.
 
 ## Filesystem scope
 
@@ -29,6 +33,8 @@ The scanner does not follow symbolic links, Windows junctions or reparse points.
 Checks are snapshot-based path checks, not a race-free sandbox. A concurrently changed directory can invalidate a previous check. Do not scan actively hostile trees. This pilot does not use handle-relative traversal with operating-system no-follow guarantees. No writes or code execution are performed even when metadata changes unexpectedly.
 
 Read errors, skipped entries, depth limits, entry limits and cancellation reduce coverage. The UI exposes this; findings with incomplete subtree measurements are excluded from the review-candidate total. Other complete findings can still be shown in a globally partial report.
+
+Markdown exports retain this distinction per finding: measurement status, a partial-size label when needed, effective risk and review-candidate eligibility. Both full and redacted exports exclude incomplete or protected findings from candidate eligibility. A completed finding can remain a candidate in a globally partial or cancelled report; this is still a request for further review, never deletion approval.
 
 ## Byte accounting
 

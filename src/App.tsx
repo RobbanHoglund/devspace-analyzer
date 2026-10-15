@@ -6,6 +6,7 @@ import type { Finding, Progress, Report, Risk } from './types';
 import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, pathsOverlap, redactedReport, summarize, treemap, visiblePath } from './analysis';
 import { demoReport } from './demo';
 import { pageBounds } from './pagination';
+import { ProtectionControls } from './ProtectionControls';
 
 type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
 const labels: Record<Risk, string> = { low: 'Lower risk', review: 'Needs review', protected: 'Protected' };
@@ -121,10 +122,6 @@ export default function App() {
   function loadDemo() {
     setReport(demoReport()); setOrigin('demo'); setDemoProtected([]); setSelected(null); setTab('overview'); setError(''); setNotice(''); clearFilters();
   }
-  function toggleProtection(f: Finding) {
-    const update = (paths: string[]) => paths.some(p => pathsOverlap(p, f.path)) ? paths.filter(p => !pathsOverlap(p, f.path)) : [...paths, f.path];
-    if (origin === 'demo') setDemoProtected(update); else setProtectedPaths(update);
-  }
   async function reveal(f: Finding) {
     try { await invoke('reveal_finding', { id: f.id }); } catch (e) { setError(String(e)); }
   }
@@ -163,7 +160,7 @@ export default function App() {
       <details><summary>Limits of this recommendation</summary><ul>{current.caveats.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
       <div className="detail-actions">
         <button disabled={!native || origin === 'demo'} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
-        {current.risk !== 'protected' && <button onClick={() => toggleProtection(current)}><Icon name="shield"/>{isProtected(current, activeProtected) ? 'Remove personal protection' : 'Protect this path'}</button>}
+        <ProtectionControls key={current.id} finding={current} findings={findings} paths={activeProtected} setPaths={origin === 'demo' ? setDemoProtected : setProtectedPaths}/>
       </div>
       <p className="tiny muted">Protection is a saved review preference, not a filesystem permission. No cleanup commands are available in this pilot.</p>
     </> : <>
