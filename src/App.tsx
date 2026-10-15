@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { invoke, isTauri } from '@tauri-apps/api/core';
-import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-import { open } from '@tauri-apps/plugin-dialog';
+import { invoke, listen, native, inVSCode, bootstrap, readPreference, savePreferences, chooseFolders as hostChooseFolders, type HostAction } from './host';
 import type { Finding, Progress, Report, Risk } from './types';
 import { bytes, effectiveRisk, findingsForProject, isProtected, markdownReport, pathsOverlap, redactedReport, summarize, visiblePath } from './analysis';
 import { demoReport } from './demo';
@@ -16,11 +14,7 @@ import { ProtectionControls } from './ProtectionControls';
 type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
 type FindingView = {query: string; eco: string; risk: string; projectFilter: string; sort: string; page: number; selected: string | null};
 const labels: Record<Risk, string> = { low: 'Lower risk', review: 'Needs review', protected: 'Protected' };
-const native = isTauri();
 const zero: Progress = { files: 0, directories: 0, logicalBytes: 0, projects: 0, currentPath: '' };
-function readPreference(key: string): string[] {
-  try { const value: unknown = JSON.parse(localStorage.getItem(key) ?? '[]'); return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string' && v.length <= 32768).slice(0, 20000) : []; } catch { return []; }
-}
 function Icon({ name }: { name: string }) {
   const paths: Record<string, string> = {
     grid: 'M3 3h7v7H3z M14 3h7v7h-7z M3 14h7v7H3z M14 14h7v7h-7z',
@@ -49,14 +43,17 @@ export default function App() {
   const [roots, setRoots] = useState<string[]>(() => readPreference('devspace.roots').slice(0, 32));
   const [protectedPaths, setProtectedPaths] = useState<string[]>(() => readPreference('devspace.protected'));
   const [demoProtected, setDemoProtected] = useState<string[]>([]);
-  const [includeCaches, setIncludeCaches] = useState(true);
+  const [includeCaches, setIncludeCaches] = useState(bootstrap.includeCaches ?? !inVSCode);
   const [manualRoot, setManualRoot] = useState('');
-  const [report, setReport] = useState<Report | null>(null);
-  const [reportScope, setReportScope] = useState<ScanScope | null>(null);
+  const [report, setReport] = useState<Report | null>(bootstrap.report ?? null);
+  const [reportScope, setReportScope] = useState<ScanScope | null>(bootstrap.reportScope ?? null);
   const [previousReport, setPreviousReport] = useState(false);
   const [origin, setOrigin] = useState<'native' | 'demo'>('native');
   const [tab, setTab] = useState<Tab>('overview');
   const [busy, setBusy] = useState(false);
+  const scanInFlight = useRef(false);
+  const [unavailable, setUnavailable] = useState(bootstrap.unavailable ?? '');
+  const hostAction = useRef<(action: HostAction) => void>(() => {});
   const [cancelling, setCancelling] = useState(false);
   const [progress, setProgress] = useState<Progress>(zero);
   const [error, setError] = useState('');
@@ -87,14 +84,22 @@ export default function App() {
 
   useEffect(() => {
     if (!native) return;
-    let off: UnlistenFn | undefined; let disposed = false;
+    let off: (() => void) | undefined; let disposed = false;
     listen<Progress>('scan-progress', e => setProgress(e.payload)).then(fn => { if (disposed) fn(); else off = fn; }).catch(e => setError(String(e)));
     return () => { disposed = true; off?.(); };
   }, []);
   useEffect(() => {
-    try { localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths)); }
-    catch { setError('Preferences could not be saved. This session still works, but choices will not survive a restart.'); }
-  }, [roots, protectedPaths]);
+    savePreferences(roots, protectedPaths, includeCaches).catch(() => setError('Preferences could not be saved. This session still works, but choices will not survive a restart.'));
+  }, [roots, protectedPaths, includeCaches]);
+  useEffect(() => {
+    if (!inVSCode) return;
+    let disposed = false; let off: (() => void) | undefined;
+    listen<HostAction>('host-action', event => hostAction.current(event.payload)).then(fn => {
+      if (disposed) { fn(); return; }
+      off = fn; invoke('ready').catch(e => setError(String(e)));
+    });
+    return () => { disposed = true; off?.(); };
+  }, []);
   useEffect(() => {
     const frame = requestAnimationFrame(() => window.scrollTo({top: scrollPositions.current[tab] ?? 0}));
     return () => cancelAnimationFrame(frame);
@@ -169,7 +174,7 @@ export default function App() {
 
   async function chooseFolders() {
     try {
-      const result = await open({ directory: true, multiple: true, title: 'Choose developer workspace folders' });
+      const result = await hostChooseFolders();
       if (result) setRoots(old => [...new Set([...old, ...(Array.isArray(result) ? result : [result])])].slice(0, 32));
     } catch (e) { setError(String(e)); }
   }
@@ -178,19 +183,20 @@ export default function App() {
     if (roots.length >= 32) { setError('A scan supports at most 32 project roots.'); return; }
     setRoots(old => [...new Set([...old, manualRoot.trim()])]); setManualRoot('');
   }
-  async function startScan() {
-    if (!native || busy) return;
+  async function startScan(scanRoots = roots) {
+    if (!native || scanInFlight.current || unavailable) return;
+    scanInFlight.current = true;
     setBusy(true); setCancelling(false); setPreviousReport(!!report); setProgress(zero); setError(''); setNotice('');
     try {
-      const result = await invoke<Report>('scan', { request: { roots, includeGlobalCaches: includeCaches, protectedPaths } });
+      const result = await invoke<Report>('scan', { request: { roots: scanRoots, includeGlobalCaches: includeCaches, protectedPaths } });
       savedSession.current = null; previousFindings.current = null; setCanReturnToFindings(false); scrollPositions.current = {}; setPage(0);
       setProjectView(emptyProjectView); setWarningView(emptyWarningView);
       setScopeExpanded(false);
-      setReportScope({roots: [...roots], includeCaches});
+      setReportScope({roots: [...scanRoots], includeCaches});
       requestAnimationFrame(() => window.scrollTo({top:0}));
       setReport(result); setOrigin('native'); setPreviousReport(false); setSelected(null); clearFilters(); setTab('overview');
     } catch (e) { setError(String(e)); }
-    finally { setBusy(false); setCancelling(false); }
+    finally { scanInFlight.current = false; setBusy(false); setCancelling(false); }
   }
   async function cancel() {
     setCancelling(true);
@@ -240,6 +246,13 @@ export default function App() {
     finally { setExporting(false); }
   }
 
+  hostAction.current = action => {
+    if (action.availability !== undefined) setUnavailable(action.availability);
+    if (action.tab) navigate(action.tab);
+    if (action.scanRoots && !scanInFlight.current) { setRoots(action.scanRoots); void startScan(action.scanRoots); }
+    if (action.cancel && busy) void cancel();
+  };
+
   const drawerActive = compactDetails && !!current && tab === 'findings';
   const feedback = (error || notice) && <div className="feedback-region" aria-label="Notifications">
         {error && <div className="error-banner" role="alert"><span>{error}</span><button aria-label="Dismiss error" onClick={() => setError('')}>×</button></div>}
@@ -266,7 +279,7 @@ export default function App() {
       {current.latestModified !== null && <p className="muted">Latest file modification: {new Date(current.latestModified * 1000).toLocaleDateString('en-GB')}. Not a last-use date.</p>}
       <details><summary>Limits of this recommendation</summary><ul>{current.caveats.map((s, i) => <li key={i}>{s}</li>)}</ul></details>
       <div className="detail-actions">
-        <button disabled={!native || origin === 'demo' || busy} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
+        <button disabled={!native || !!unavailable || origin === 'demo' || busy} onClick={() => reveal(current)}><Icon name="folder"/>Open folder</button>
         <ProtectionControls key={current.id} finding={current} findings={findings} paths={activeProtected} setPaths={origin === 'demo' ? setDemoProtected : setProtectedPaths}/>
       </div>
       <p className="tiny muted">Protection is a saved review preference, not a filesystem permission. No cleanup commands are available in this pilot.</p>
@@ -292,13 +305,14 @@ export default function App() {
     </aside>
     <main>
       <header className="topbar"><div><div className="eyebrow">DEVELOPER STORAGE / {tab.toUpperCase()}</div><h1>{report ? ({overview:'Overview',findings:'Findings',projects:'Projects',coverage:'Scan coverage'}[tab]) : tab === 'overview' ? 'Know what takes your space.' : tab === 'findings' ? 'Inspect your development data.' : tab === 'projects' ? 'Your projects, in context.' : 'A clear view of the scan scope.'}</h1></div><span className="readonly"><Icon name="shield"/>Read-only pilot</span></header>
-      {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available only in the desktop application.</div>}
+      {unavailable && <div className="host-unavailable" role="status">{unavailable}</div>}
+      {!native && <div className="browser-note">Browser preview · Real filesystem scanning is available in the desktop application or VS Code extension.</div>}
       {origin === 'demo' && report && <div className="demo-banner" role="status"><strong>DEMO · SYNTHETIC DATA</strong><span>These figures are illustrative. This computer has not been scanned.</span><button disabled={busy} onClick={exitDemo}>Exit demo</button></div>}
       {previousReport && report && <div className="previous-report" role="status">{busy ? 'Showing the previous report while a new scan runs.' : 'The new scan failed. The previous report is still available for inspection and export.'}</div>}
       <section className="scope panel" aria-label="Scan configuration">
-        {report ? <div className="scope-top"><div><strong>Next scan</strong><span className="muted">{roots.length} workspace {roots.length === 1 ? 'folder' : 'folders'} · Shared caches {includeCaches ? 'included' : 'excluded'}</span></div><div className="scope-actions"><button aria-expanded={scopeExpanded} aria-controls="scan-settings" onClick={() => setScopeExpanded(value => !value)}>Scan settings</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div></div> : <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || busy || (!roots.length && !includeCaches)} onClick={startScan}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>}
+        {report ? <div className="scope-top"><div><strong>Next scan</strong><span className="muted">{roots.length} workspace {roots.length === 1 ? 'folder' : 'folders'} · Shared caches {includeCaches ? 'included' : 'excluded'}</span></div><div className="scope-actions"><button aria-expanded={scopeExpanded} aria-controls="scan-settings" onClick={() => setScopeExpanded(value => !value)}>Scan settings</button><button className="primary" disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button><button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button></div></div> : <div className="scope-top"><div><strong>Scan scope</strong><span className="muted">Choose workspace folders. Known shared caches are optional.</span></div><div className="scope-actions"><button onClick={chooseFolders} disabled={!native || !!unavailable || busy}><Icon name="folder"/>Choose folders</button><button className="primary" disabled={!native || !!unavailable || busy || (!roots.length && !includeCaches)} onClick={() => startScan()}><Icon name="scan"/>{busy ? 'Scanning…' : 'Scan workspace'}</button></div></div>}
         <div id="scan-settings" hidden={!!report && !scopeExpanded}>
-        {report && <button onClick={chooseFolders} disabled={!native || busy}><Icon name="folder"/>Choose folders</button>}
+        {report && <button onClick={chooseFolders} disabled={!native || !!unavailable || busy}><Icon name="folder"/>Choose folders</button>}
         <div className="root-list">{roots.map(root => <span className="root-chip" key={root} title={root}><Icon name="folder"/><span>{visiblePath(root)}</span><button disabled={busy} aria-label={`Remove ${root}`} onClick={() => setRoots(old => old.filter(p => p !== root))}>×</button></span>)}</div>
         <div className="scope-options"><form onSubmit={e => { e.preventDefault(); addManual(); }}><input aria-label="Add folder path" value={manualRoot} onChange={e => setManualRoot(e.target.value)} placeholder="Or enter a folder path, e.g. C:\\Workspaces" disabled={busy}/><button disabled={busy || !manualRoot.trim()} type="submit">Add</button></form><label><input type="checkbox" checked={includeCaches} disabled={busy} onChange={e => setIncludeCaches(e.target.checked)}/>Include known shared caches</label>{!report && <button className="text-button" onClick={loadDemo} disabled={busy}>Explore demo</button>}</div>
         </div>

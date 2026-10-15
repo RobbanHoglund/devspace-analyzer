@@ -1,0 +1,68 @@
+name: VS Code extension
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: vscode-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    name: VSIX · ${{ matrix.target }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: win32-x64
+          - os: ubuntu-22.04
+            target: linux-x64
+          - os: macos-15-intel
+            target: darwin-x64
+          - os: macos-latest
+            target: darwin-arm64
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: npm ci --no-audit --no-fund
+      - run: npm ci --prefix vscode --no-audit --no-fund
+      - name: Build platform VSIX with bundled scanner
+        run: npm run package --prefix vscode
+      - name: Protocol, cancellation, read-only scan and export regression tests
+        run: npm test --prefix vscode
+      - name: Install VSIX and exercise real VS Code
+        if: runner.os != 'Linux'
+        run: npm run test:integration --prefix vscode
+      - name: Install VSIX and exercise real VS Code (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration --prefix vscode
+      - name: Restricted Mode refuses scans and permits demo
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm run test:integration --prefix vscode -- --restricted
+      - name: Verify locked dependencies
+        run: git diff --exit-code -- package-lock.json Cargo.lock vscode/package-lock.json
+      - name: Retain test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vscode-checks-${{ matrix.target }}
+          path: |
+            artifacts/*.png
+            artifacts/*.json
+          retention-days: 14
+      - name: Retain verified installable extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: devspace-vscode-${{ matrix.target }}
+          path: artifacts/*.vsix
+          if-no-files-found: error
+          retention-days: 14
