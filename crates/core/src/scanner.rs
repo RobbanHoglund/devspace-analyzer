@@ -1,6 +1,7 @@
 use std::{collections::BTreeSet, fs, path::{Path, PathBuf}, sync::atomic::{AtomicBool, Ordering}, time::{Duration, Instant, SystemTime, UNIX_EPOCH}};
 use crate::{config::{self, Environment}, model::*, paths::{display, git_marker, is_link, key, normalize, regular, small_text, within}};
 mod rules;
+mod scope;
 
 const MAX_ENTRIES: u64 = 5_000_000;
 const MAX_DEPTH: usize = 128;
@@ -144,7 +145,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
     if unique.is_empty() { return Err("No accessible scan directories. Add a project folder or check your cache paths.".into()); }
     s.report.roots = unique.iter().map(|p| display(p)).collect();
     s.report.global_caches.retain(|c| unique.iter().any(|r| within(Path::new(&c.path), r) || within(r, Path::new(&c.path))));
-    for root in &unique { s.visit(root, None, 0); if s.halted() { break; } }
+    for root in &unique { s.visit_root(root); if s.halted() { break; } }
     for finding in &mut s.report.findings {
         if let Some(version) = &finding.wrapper_version {
             finding.wrapper_references = s.report.projects.iter().filter(|p| p.wrapper_version.as_ref() == Some(version)).map(|p| p.id.clone()).collect();
@@ -239,9 +240,9 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         }
         total
     }
-    fn visit(&mut self, path: &Path, owner: Option<usize>, depth: usize) {
+    fn visit(&mut self, path: &Path, owner: Option<usize>, depth: usize, context: Option<Rule>) {
         let Some(meta) = self.metadata(path, depth) else { return; };
-        if let Some(mut rule) = self.rule(path, owner, meta.is_dir()) {
+        if let Some(mut rule) = context.or_else(|| self.rule(path, owner, meta.is_dir())) {
             if self.report.findings.len() >= MAX_FINDINGS { self.warn(path, "finding-limit", "Finding limit reached. Scan narrower roots."); self.stopped = true; return; }
             let aggregate = Aggregate { root: path.to_path_buf(), owner, artifact: rule.kind != "git-metadata" };
             let size = self.measure(path, depth, owner, &aggregate, false);
@@ -274,7 +275,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
         match fs::read_dir(path) {
             Ok(entries) => for entry in entries {
                 if self.halted() { break; }
-                match entry { Ok(e) => self.visit(&e.path(), next_owner, depth + 1), Err(e) => self.warn(path, "entry-unavailable", &e.to_string()) }
+                match entry { Ok(e) => self.visit(&e.path(), next_owner, depth + 1, None), Err(e) => self.warn(path, "entry-unavailable", &e.to_string()) }
             },
             Err(e) => self.warn(path, "directory-unavailable", &e.to_string()),
         }

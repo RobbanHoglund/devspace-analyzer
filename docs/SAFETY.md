@@ -26,6 +26,8 @@ Yarn `.yarn` directories, unrecognized `venv`/`.venv` directories and `__pycache
 
 ## Filesystem scope
 
+Selecting a subtree preserves intrinsic protection from enclosing storage, including Yarn, Git metadata, unrecognized environments and protected shared-cache categories. Ancestor context is checked up to 128 levels without measuring siblings. Selecting a descendant of a policy-excluded directory still excludes it; unresolved ancestor depth stops that root with a coverage warning.
+
 Overlapping selected roots and shared-cache locations are collapsed to an effective union. Aggregate findings stop further classification below that finding, preventing parent/child finding sums from double counting. Nested projects own their own bytes rather than charging them to every ancestor project.
 
 The scanner does not follow symbolic links, Windows junctions or reparse points. A selected root containing a linked ancestor is rejected. Some cloud-placeholder files are therefore skipped. Sensitive directories such as `.ssh` and `.gnupg`, and major Windows system directories at the drive root, are excluded by default.
