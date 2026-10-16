@@ -61,7 +61,7 @@ export async function run(): Promise<void> {
     await storage.getByRole('button', { name: /^Open folder: example,/ }).waitFor();
     await view.getByRole('button', { name: 'Go back', exact: true }).click();
     await nestedNode.waitFor();
-    assert.equal(await nestedNode.evaluate(el => el === el.ownerDocument.activeElement), true);
+    await waitFor(() => nestedNode.evaluate(el => el === el.ownerDocument.activeElement), 'Back did not restore focus to the nested folder tile');
     for (const folder of ['workspace', 'node_modules', 'example']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
     await storage.getByText('index.js', { exact: true }).waitFor();
     await view.getByRole('button', { name: 'Go back', exact: true }).click();
