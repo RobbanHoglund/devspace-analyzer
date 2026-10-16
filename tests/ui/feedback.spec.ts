@@ -19,7 +19,7 @@ test('folder action errors remain visible and dismissible inside a modal detail 
     bridge.invoke=async (command,args)=>{if(command==='reveal_finding')throw new Error('Folder unavailable');return invoke(command,args);};
   });
   await page.getByRole('button',{name:/Installed Node dependencies/}).click();
-  await page.getByRole('button',{name:'Open folder',exact:true}).click();
+  await page.getByRole('button',{name:'Show in file manager',exact:true}).click();
   const drawer=page.getByRole('dialog',{name:'Finding details'});
   await expect(drawer.getByRole('alert')).toContainText('Folder unavailable');
   const dismiss=drawer.getByRole('button',{name:'Dismiss error'});

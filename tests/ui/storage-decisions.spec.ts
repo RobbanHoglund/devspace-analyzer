@@ -35,7 +35,7 @@ for (const width of [380, 1440]) test(`storage drill-down explains other files a
   await storage.locator('.storage-folder').filter({ hasText: 'logs' }).click();
   await expect(storage).toContainText('application.log'); await expect(storage).toContainText('20 MiB');
   await expect(storage.locator('.storage-file').filter({ hasText: 'Other direct files' })).toContainText('2 MiB');
-  await storage.getByRole('button', { name: 'Open folder', exact: true }).click();
+  await storage.getByRole('button', { name: 'Show in file manager', exact: true }).click();
   expect(JSON.parse(await page.evaluate(() => localStorage.getItem('opened-storage')!))).toHaveProperty('id');
   await page.screenshot({ path: `test-results/storage-other-${width}.png`, fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);

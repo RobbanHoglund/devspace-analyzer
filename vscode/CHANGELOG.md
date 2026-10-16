@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- One Back/Forward history for views, folders and map groups, restoring filters, focus and scroll position. New scans start a new history; demo history stays separate.
+- Sticky Up and folder breadcrumbs, a compact parent-folder menu for deep paths, and Alt+Left/Right/Up shortcuts.
+- Explore all folders directly from Overview, return directly from finding drawers, and distinguish the file-manager action from navigation within DevSpace.
+
 ## 0.2.1
 
 - Interactive folder treemap in Storage: click into folders, explore smaller-item groups and file samples, and navigate back with breadcrumbs or Up.

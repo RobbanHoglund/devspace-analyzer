@@ -67,7 +67,7 @@ test('a cancelled rescan replaces the clearly marked previous report with partia
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   await expect(page.getByText('Showing the previous report while a new scan runs.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Show in file manager', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Cancel scan', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Cancelled · partial results', exact: true })).toBeVisible();
   await expect(page.getByText('Showing the previous report while a new scan runs.')).toHaveCount(0);

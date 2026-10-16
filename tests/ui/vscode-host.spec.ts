@@ -22,6 +22,7 @@ for (const width of [380, 760, 1440]) {
         const { command, id, args } = message;
         let result: any = null;
         if (command === 'choose_folders') result = ++folderRequests === 2 ? ['C:/Workspaces', 'C:/Workspaces'] : null;
+        if (command === 'set_view') localStorage.setItem('active-native-tab', args.tab);
         if (command === 'scan') { localStorage.setItem('vscode-request', JSON.stringify(args)); result = report; }
         if (command === 'save_export') { localStorage.setItem('vscode-export', args.content); result = 'C:/Reports/new-report.json'; }
         queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'response', id, result } })));
@@ -75,6 +76,11 @@ for (const width of [380, 760, 1440]) {
       if (overflow.document > overflow.width + 1) console.log('VS_CODE_OVERFLOW', name, JSON.stringify(overflow));
       expect(overflow.document, `Overflow in ${name}`).toBeLessThanOrEqual(overflow.width + 1);
     }
+    await page.getByRole('button', { name: 'Go back', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true }).first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('active-native-tab'))).toBe('projects');
+    await page.getByRole('button', { name: 'Go forward', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('active-native-tab'))).toBe('coverage');
     await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab: 'findings' } } })));
     await expect(page.getByLabel('Ecosystem filter')).toBeVisible();
     const label = await page.locator('.finding-button strong').first().innerText();

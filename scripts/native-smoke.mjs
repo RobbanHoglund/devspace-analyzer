@@ -91,7 +91,7 @@ try {
   await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
   await expect(page.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
-  await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Show in file manager', exact: true })).toBeEnabled();
   await expect(page.getByRole('complementary', { name: 'Finding details' })).toContainText('1 KiB');
   await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Remove my exclusion', exact: true })).toBeVisible();
@@ -111,6 +111,10 @@ try {
   await page.getByRole('button', { name: 'Storage', exact: true }).click();
   const storage = page.getByRole('region', { name: 'Storage breakdown' });
   for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
+  await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await expect(storage.getByRole('button', { name: /^Open folder: classes,/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Go forward', exact: true }).click();
   await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
   await expect(storage.locator('.storage-file')).toContainText('2 KiB');
   await page.screenshot({ path: join(artifacts, 'native-storage.png'), fullPage: true });

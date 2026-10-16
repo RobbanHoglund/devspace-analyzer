@@ -56,7 +56,16 @@ export async function run(): Promise<void> {
     await waitFor(() => api.getStatus().activeTab === 'storage' && api.getStatus().selectedTab === 'storage', 'Native sidebar did not follow Storage');
     for (const folder of ['workspace', 'node_modules', 'example']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
     await storage.getByText('index.js', { exact: true }).waitFor();
-    assert.equal(await storage.getByRole('button', { name: 'Open folder', exact: true }).isEnabled(), true);
+    await view.getByRole('button', { name: 'Go back', exact: true }).click();
+    await storage.getByRole('button', { name: /^Open folder: example,/ }).waitFor();
+    await view.getByRole('button', { name: 'Go forward', exact: true }).click();
+    await storage.getByText('index.js', { exact: true }).waitFor();
+    await storage.getByRole('button', { name: /^Explore group: Files directly here,/ }).focus();
+    await view.page().keyboard.press('Alt+ArrowLeft');
+    await storage.getByRole('button', { name: /^Open folder: example,/ }).waitFor();
+    await view.getByRole('button', { name: 'Go forward', exact: true }).click();
+    await storage.getByText('index.js', { exact: true }).waitFor();
+    assert.equal(await storage.getByRole('button', { name: 'Show in file manager', exact: true }).isEnabled(), true);
     await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-storage.png`) });
     await vscode.commands.executeCommand('devspace.findings');
     await view.getByRole('heading', { name: /Findings/ }).first().waitFor();
@@ -90,6 +99,6 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.open');
     await waitFor(() => api.getStatus().ready, 'Reopened view did not restore');
     assert.ok(api.getStatus().findings >= 1);
-    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, storageDrilldown: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
+    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, storageDrilldown: true, navigationHistory: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
   } finally { await browser.close(); }
 }

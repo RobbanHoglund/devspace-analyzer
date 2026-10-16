@@ -4,13 +4,15 @@
 
 Windows-first desktop pilot for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Pilot 0.2.1 is read-only. Project-specific commands can be reviewed and copied, but DevSpace never executes them or changes scanned files. Candidate sizes are logical bytes, not guaranteed physical space savings.
+> Pilot 0.2.2 is read-only. Project-specific commands can be reviewed and copied, but DevSpace never executes them or changes scanned files. Candidate sizes are logical bytes, not guaranteed physical space savings.
 
-## Pilot 0.2.1
+## Pilot 0.2.2
 
 Follow measured space into individual folders, see the evidence and prerequisites behind a project-specific review plan, and rescan the same scope to measure changes. A fresh scan captures the new folder breakdown and recovery evidence; older reports remain readable.
 
 ## Features
+
+- Back/Forward history restores the view, folder, filters and scroll position. Sticky folder breadcrumbs, parent-folder shortcuts and Up navigation also cover small-item groups; Alt+Left/Right/Up work outside text fields.
 
 - Clickable distribution donut shows the share of measured space by ecosystem, including unclassified files. Select a segment to inspect its findings or folders.
 - Folder treemap makes large directories visible at a glance. Click to drill down, return through breadcrumbs, or explore smaller items in grouped tiles. File samples and bytes without retained detail keep their share of the total.
