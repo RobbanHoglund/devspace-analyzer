@@ -15,8 +15,8 @@ import { ProjectInventory, emptyProjectView, type ProjectView } from './ProjectI
 import { ProtectionControls } from './ProtectionControls';
 import { StorageBrowser, type StorageView } from './StorageBrowser';
 import { directoryFor } from './storage';
-import { ReviewPlan } from './ReviewPlan';
-import { ScanComparison } from './ScanComparison';
+import { ReviewPlan } from './ProjectReviewPlan';
+import { ScanComparison } from './ScanComparisonPanel';
 import { makeSnapshot, readSnapshot } from './scanComparison';
 
 type Tab = 'overview' | 'storage' | 'findings' | 'projects' | 'coverage';
