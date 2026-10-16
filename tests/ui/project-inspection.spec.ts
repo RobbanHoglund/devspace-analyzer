@@ -27,7 +27,7 @@ test('nested project Inspect exposes the protected aggregate without changing to
   await expect(page.locator('.project-context')).toContainText('inside protected storage');
   await page.getByRole('button', { name: /Protected mixed build/ }).click();
   await expect(page.getByRole('complementary', { name: 'Finding details' }).locator('.badge')).toHaveText(/Protected/);
-  await expect(page.getByRole('button', { name: 'Protect this path', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Exclude from review', exact: true })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Scan summary' })).toHaveText(summary);
   await page.getByLabel('Risk filter').selectOption('review'); await expect(page.locator('tbody tr')).toHaveCount(0);
   await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();

@@ -2,7 +2,7 @@
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
   "description": "Local, read-only analysis of developer projects, build output and shared caches.",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "publisher": "RobbanHoglund",
   "license": "UNLICENSED",
   "repository": {

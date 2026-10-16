@@ -92,8 +92,8 @@ try {
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
   await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeEnabled();
   await expect(page.getByRole('complementary', { name: 'Finding details' })).toContainText('1 KiB');
-  await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove my exclusion', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
   await expect(page.getByRole('button', { name: /Installed Node dependencies/ })).toBeFocused();
   await page.getByRole('button', { name: /Possible Node build artifacts/ }).click();
@@ -102,7 +102,7 @@ try {
   await expect(detail).toContainText('entire aggregate is excluded from review candidates');
   await expect(detail).toContainText('Virtual disk image');
   await expect(detail).toContainText('Explicit nested Git project');
-  await expect(detail.getByRole('button', { name: 'Protect this path', exact: true })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Exclude from review', exact: true })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(artifacts, 'native-findings.png'), fullPage: true });
   expect(snapshot(workspace)).toEqual(before);

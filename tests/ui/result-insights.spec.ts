@@ -24,7 +24,7 @@ test('the takeaway explains Gradle storage and connects all measured bytes to re
   await navigate(page, 'Overview');
   await insights.getByRole('button', { name: 'Review build', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Suggested review step' })).toContainText('configured build outputs');
-  await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
+  await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
   await navigate(page, 'Overview');
   await expect(insights).toContainText('200 MiB in 1 location to review');
   await expect(insights).not.toContainText('Gradle build output');

@@ -27,14 +27,14 @@ for (const count of [0, 1, 50, 51, 100, 101]) {
     await expect(page.locator('.pagination')).toContainText(`${start}–${count} of ${count}`);
     await expect(page.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
     await page.getByRole('button', { name: `Boundary fixture ${count - 1}`, exact: false }).click();
-    await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
+    await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
     const remaining = count - 1; const expectedPage = Math.max(0, Math.ceil(remaining / 50) - 1);
     await expect(page.locator('tbody tr')).toHaveCount(remaining ? Math.min(50, remaining - expectedPage * 50) : 0);
     // Leaving the active risk filter closes the finding, including on the last page.
-    await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('button', { name: 'Remove my exclusion', exact: true })).toHaveCount(0);
     await page.getByLabel('Risk filter').selectOption('protected');
     await page.getByRole('button', { name: `Boundary fixture ${count - 1}`, exact: false }).click();
-    await page.getByRole('button', { name: 'Remove personal protection', exact: true }).click();
+    await page.getByRole('button', { name: 'Remove my exclusion', exact: true }).click();
     await expect(page.locator('tbody tr')).toHaveCount(0);
     await page.getByLabel('Risk filter').selectOption('review');
     await expect(page.locator('.pagination')).toContainText(`1–${Math.min(count, 50)} of ${count}`);

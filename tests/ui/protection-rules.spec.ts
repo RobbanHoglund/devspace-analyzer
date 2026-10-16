@@ -24,7 +24,7 @@ async function protectThenNarrow(page: Page, extraPaths: string[] = []) {
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   await page.getByRole('button', { name: /Findings/ }).first().click();
   await page.getByRole('button', { name: /Build aggregate/ }).click();
-  if (!extraPaths.length) await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
+  if (!extraPaths.length) await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   await page.getByRole('button', { name: /Findings/ }).first().click();
   await page.getByRole('button', { name: /Node dependencies/ }).click();
@@ -33,13 +33,13 @@ async function protectThenNarrow(page: Page, extraPaths: string[] = []) {
 
 test('inherited protection is not removed by a finding-local action', async ({ page }) => {
   await protectThenNarrow(page);
-  await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Remove my exclusion', exact: true })).toHaveCount(0);
   const rules = page.getByRole('region', { name: 'Shared protection rules' });
   await expect(rules).toContainText('C:/work/build');
   await expect(rules).toContainText('2 findings');
   await rules.getByRole('button', { name: 'Review removal', exact: true }).click();
   await expect(page.locator('tbody .risk-protected')).toHaveCount(2);
-  await rules.getByRole('button', { name: 'Keep protection', exact: true }).click();
+  await rules.getByRole('button', { name: 'Keep exclusion', exact: true }).click();
   await expect(page.locator('tbody .risk-protected')).toHaveCount(2);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('devspace.protected')!))).toContain('C:/work/build');
 });

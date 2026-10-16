@@ -17,7 +17,7 @@ export function findingTitle(finding: Finding): string {
 
 export function reviewStep(finding: Finding, protectedPaths: string[]): string {
   if (isProtected(finding, protectedPaths)) {
-    if (finding.risk !== 'protected') return 'You protected this location. Keep it out of the review list unless you deliberately change that preference.';
+    if (finding.risk !== 'protected') return 'Your saved folder preference excludes this location from review suggestions. It still counts toward measured storage; no files have been locked or changed.';
     if (finding.protectedDescendantCount) return 'This location contains protected data. Inspect the protected locations below; do not treat the whole folder as disposable.';
     return finding.recovery;
   }
@@ -46,7 +46,7 @@ export function reviewCandidates(findings: Finding[], protectedPaths: string[]):
 }
 
 export function reviewLabel(finding: Finding, protectedPaths: string[]): string {
-  if (isProtected(finding, protectedPaths)) return 'Preserve this location';
+  if (isProtected(finding, protectedPaths)) return finding.risk === 'protected' ? 'Preserve this location' : 'Excluded by your preference';
   if (!finding.complete) return 'Resolve coverage first';
   switch (finding.kind) {
     case 'gradle-project': return folderName(finding.path) === '.gradle' ? 'Check project cache' : 'Check custom outputs';

@@ -22,8 +22,8 @@ test('filters, details and protection operate on real view state', async ({ page
   await page.getByLabel('Ecosystem filter').selectOption('Node');
   await expect(page.locator('tbody tr')).toHaveCount(2);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
-  await page.getByRole('button', { name: 'Protect this path' }).click();
-  await expect(page.getByRole('button', { name: 'Remove personal protection' })).toBeVisible();
+  await page.getByRole('button', { name: 'Exclude from review' }).click();
+  await expect(page.getByRole('button', { name: 'Remove my exclusion' })).toBeVisible();
   await page.getByLabel('Risk filter').selectOption('protected'); await expect(page.locator('tbody tr')).toHaveCount(1);
   await page.getByLabel('Search findings').fill('does-not-exist'); await expect(page.getByText('No findings match these filters.')).toBeVisible();
   await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();

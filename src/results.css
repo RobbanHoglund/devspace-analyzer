@@ -16,6 +16,8 @@
 .export-popover{left:auto;right:0;width:min(420px,calc(100vw - 32px))}
 .export-formats{display:flex;gap:8px;margin-top:16px;flex-wrap:wrap}
 .scope[hidden]{display:none}
+.scope-options form{flex-wrap:wrap;min-width:min(260px,100%);max-width:620px}
+.scope-options form input{flex:1 1 240px}
 .report-present .scope{margin-bottom:20px}
 .result-insights{margin:4px 0 24px}
 .takeaway-heading{display:flex;align-items:flex-start;gap:24px;justify-content:space-between;margin-bottom:20px}
@@ -79,6 +81,7 @@
 .detail .next-step h3{margin:0 0 6px;font-size:14px}
 .detail .next-step p{font-size:14px;line-height:1.65;margin:0}
 .detail-actions{margin:12px 0 24px}
+.detail-actions .protection-help{font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 4px}
 .assessment-hint{white-space:normal;max-width:200px;line-height:1.5}
 .project-takeaway{margin:0 16px 14px;padding:12px 14px;border-left:3px solid var(--accent);background:var(--surface-raised);display:flex;gap:4px 18px;align-items:baseline;flex-wrap:wrap}
 .project-takeaway strong{overflow-wrap:anywhere}

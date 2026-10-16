@@ -19,7 +19,7 @@ describe('result guidance respects the scanner evidence', () => {
     const selected = reviewCandidates(findings, [findings[1].path]);
     expect(selected.map(f => f.id)).toEqual(['f5', 'f6', 'f7', 'f8']);
     expect(reviewStep(findings[0], [])).toContain('excluded from the review total');
-    expect(reviewStep(findings[1], [findings[1].path])).toContain('You protected this location');
+    expect(reviewStep(findings[1], [findings[1].path])).toContain('excludes this location from review suggestions');
   });
   it('does not confuse a missing wrapper reference with disuse or hide protected contents', () => {
     const wrapper = demoReport().findings[4];
