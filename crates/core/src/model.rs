@@ -63,7 +63,48 @@ pub struct Project {
     pub context_only: bool,
     pub owned_logical_bytes: u64,
     pub artifact_bytes: u64,
+    #[serde(default)]
+    pub recovery_evidence: Option<RecoveryEvidence>,
 }
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RecoveryEvidence {
+    pub wrappers: Vec<String>,
+    pub node_manifest: String,
+    pub package_manager: Option<String>,
+    pub scripts: Vec<String>,
+    pub local_dependencies: Vec<String>,
+    pub local_dependency_count: usize,
+    pub install_scripts: bool,
+    pub patches: bool,
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageInventory {
+    pub directories: Vec<StorageDirectory>,
+    pub truncated: bool,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageDirectory {
+    pub id: usize,
+    pub parent_id: Option<usize>,
+    pub path: String,
+    pub logical_bytes: u64,
+    pub files: u64,
+    pub classified_bytes: u64,
+    pub direct_classified_bytes: u64,
+    pub direct_file_bytes: u64,
+    pub direct_files: u64,
+    pub largest_files: Vec<StorageFile>,
+    pub complete: bool,
+    pub omitted_directories: u64,
+}
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StorageFile { pub name: String, pub logical_bytes: u64 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,4 +146,6 @@ pub struct Report {
     pub cancelled: bool,
     pub size_basis: String,
     pub limitations: Vec<String>,
+    #[serde(default)]
+    pub storage: StorageInventory,
 }

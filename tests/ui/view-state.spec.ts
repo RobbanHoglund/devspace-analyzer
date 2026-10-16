@@ -24,5 +24,5 @@ test('demo round trip restores pagination after a filtered native report', async
 
 test('overview recommendations open correctly after a prior filtered findings view',async ({page})=>{
   await loadReport(page);await navigate(page,'Findings');await page.getByLabel('Ecosystem filter').selectOption('Python');await navigate(page,'Overview');
-  await page.locator('.review-item').first().click();await expect(page.locator('.detail h2')).toHaveText('Gradle dependency cache');await expect(page.getByLabel('Ecosystem filter')).toHaveValue('all');
+  await page.locator('.review-item').first().click();await expect(page.locator('.detail h2')).toHaveText('Gradle build output');await expect(page.getByLabel('Ecosystem filter')).toHaveValue('all');
 });

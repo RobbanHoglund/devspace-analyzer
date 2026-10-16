@@ -16,7 +16,7 @@ export async function run(): Promise<void> {
   assert.ok(extension.extensionPath.toLowerCase().startsWith(path.join(temporary, 'extensions').toLowerCase()), 'Test the installed VSIX, not the source checkout');
   const api = await extension.activate();
   const commands = await vscode.commands.getCommands(true);
-  for (const name of ['open', 'scanWorkspace', 'scanFolder', 'cancel', 'findings', 'coverage']) assert.ok(commands.includes(`devspace.${name}`));
+  for (const name of ['open', 'scanWorkspace', 'scanFolder', 'cancel', 'findings', 'storage', 'coverage']) assert.ok(commands.includes(`devspace.${name}`));
   await vscode.commands.executeCommand('workbench.view.extension.devspace');
   if (commands.includes('workbench.action.closeAuxiliaryBar')) await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
   await vscode.commands.executeCommand('devspace.open');
@@ -50,12 +50,30 @@ export async function run(): Promise<void> {
     assert.equal(await view.getByRole('navigation').count(), 0, 'Navigation belongs in the native sidebar');
     await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-overview.png`) });
     assert.deepEqual(await readFile(fixtureFile), before.bytes); assert.equal((await stat(fixtureFile)).mtimeMs, before.mtime);
+    await vscode.commands.executeCommand('devspace.storage');
+    const storage = view.getByRole('region', { name: 'Storage breakdown' });
+    await storage.waitFor();
+    await waitFor(() => api.getStatus().activeTab === 'storage' && api.getStatus().selectedTab === 'storage', 'Native sidebar did not follow Storage');
+    for (const folder of ['workspace', 'node_modules', 'example']) await storage.locator('.storage-folder').filter({ hasText: folder }).click();
+    await storage.getByText('index.js', { exact: true }).waitFor();
+    assert.equal(await storage.getByRole('button', { name: 'Open folder', exact: true }).isEnabled(), true);
+    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-storage.png`) });
     await vscode.commands.executeCommand('devspace.findings');
     await view.getByRole('heading', { name: /Findings/ }).first().waitFor();
     await waitFor(() => api.getStatus().activeTab === 'findings' && api.getStatus().selectedTab === 'findings', 'Native sidebar did not follow the active result view');
     await view.locator('.finding-button').first().click();
     await view.getByRole('heading', { name: /Node dependencies/ }).waitFor();
+    await view.getByRole('region', { name: 'Project review plan' }).getByText('package.json read successfully', { exact: true }).waitFor();
     await view.getByRole('button', { name: 'Close finding details' }).click();
+    // Only the disposable test fixture is changed, to verify an actual scanner delta.
+    await writeFile(fixtureFile, Buffer.concat([before.bytes, Buffer.alloc(1024, 1)]));
+    const changed = { bytes: await readFile(fixtureFile), mtime: (await stat(fixtureFile)).mtimeMs };
+    await vscode.commands.executeCommand('devspace.overview');
+    const comparison = view.getByRole('region', { name: 'Changes since previous scan' });
+    await comparison.getByRole('button', { name: 'Rescan the same scope' }).click();
+    await comparison.getByText('1 KiB more measured', { exact: true }).waitFor();
+    assert.deepEqual(await readFile(fixtureFile), changed.bytes); assert.equal((await stat(fixtureFile)).mtimeMs, changed.mtime);
+    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-comparison.png`) });
     const themes: [string, string][] = [['Default Dark Modern', 'vscode-dark'], ['Default Light Modern', 'vscode-light'], ['Default High Contrast', 'vscode-high-contrast'], ['Default High Contrast Light', 'vscode-high-contrast-light']];
     for (const [name, css] of themes) {
       await vscode.workspace.getConfiguration('workbench').update('colorTheme', name, vscode.ConfigurationTarget.Global);
@@ -70,6 +88,6 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.open');
     await waitFor(() => api.getStatus().ready, 'Reopened view did not restore');
     assert.ok(api.getStatus().findings >= 1);
-    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
+    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, storageDrilldown: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
   } finally { await browser.close(); }
 }

@@ -15,7 +15,10 @@ The Rust scanner is included in the VSIX. End users do not need Rust, Node, Java
 
 ## What you get
 
-- Overview, searchable Findings, Projects and Scan coverage in a reusable analysis tab.
+- Overview, searchable Findings, folder-level Storage, Projects and Scan coverage in a reusable analysis tab.
+- Follow unclassified space into child folders and large file samples, with complete byte totals even when retained detail is limited.
+- Project-specific review plans show recovery evidence, missing prerequisites, next steps and tradeoffs. Suitable commands can be copied for manual review; DevSpace never executes them.
+- Rescan the same scope to compare measured totals and finding paths. Partial scans cannot overwrite the last complete comparison baseline.
 - A scan takeaway with concrete review checks, plus a breakdown connecting review candidates, protected data, incomplete findings and other measured files to the total.
 - Native sidebar navigation that follows the active result view, and explicit workspace/folder scanning.
 - Progress and cancellation, with partial results when the scanner can stop gracefully.
@@ -24,9 +27,9 @@ The Rust scanner is included in the VSIX. End users do not need Rust, Node, Java
 - VS Code dark, light and high-contrast colors, keyboard navigation and detail drawers in narrow editor groups.
 - Clearly labelled synthetic demo data. Demo mode restores your real report when you exit it.
 
-Shared caches are **off by default** in the extension. Enable them explicitly in Scan settings when you want a wider scan. Scan roots/cache inclusion are remembered for the workspace; personal protection preferences stay in this VS Code profile. Reports remain in memory until you export them. Closing and reopening the analysis tab keeps the latest native report for this VS Code session; filters return to their initial values when the tab is closed. Switching views or temporarily hiding the tab preserves the active view.
+Shared caches are **off by default** in the extension. Enable them explicitly in Scan settings when you want a wider scan. Scan roots/cache inclusion and a compact comparison baseline (paths, sizes, scope and timestamp) are remembered for the workspace; personal protection preferences stay in this VS Code profile. Full reports remain in memory until you export them. Closing and reopening the analysis tab keeps the latest native report for this VS Code session; filters return to their initial values when the tab is closed. Switching views or temporarily hiding the tab preserves the active view.
 
-Review suggestions use the scanner's existing categories and recovery evidence. They are ordered by logical size and exclude protected, empty and incompletely measured locations. They do not establish that data can be deleted or how much physical disk space would be recovered. **Other measured files** have no supported category; this version does not retain their individual file sizes or compare scans over time. After a real scan, **Explore demo** is available inside **Scan settings**.
+Review suggestions use project recovery evidence first, then logical size, and exclude protected, empty and incompletely measured locations. They do not establish that data can be deleted or how much physical disk space would be recovered. **Other measured files** opens Storage with an unclassified-only filter; their contents and recoverability have not been assessed. Run a fresh scan after upgrading to capture this new detail. After a real scan, **Explore demo** is available inside **Scan settings**.
 
 ## Supported environments
 

@@ -97,7 +97,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
                 ecosystems: vec!["Gradle".into()], markers: vec![format!("Static module declaration in {}", display(settings))],
                 lockfiles: LOCKS.iter().filter(|m| regular(&path.join(m))).map(|m| m.to_string()).collect(),
                 git_kind: None, branch: None, wrapper_version: None, workspace: false, context_only: false,
-                owned_logical_bytes: 0, artifact_bytes: 0,
+                owned_logical_bytes: 0, artifact_bytes: 0, recovery_evidence: Some(evidence::recovery_evidence(path)),
             })
         })?;
         // A declared module can have an unrelated manifest as well.

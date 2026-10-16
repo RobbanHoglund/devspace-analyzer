@@ -4,15 +4,19 @@
 
 Windows-first desktop pilot for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Pilot 0.1.1 is read-only. There are no cleanup, dependency-installation or project build-execution commands. Candidate sizes are logical bytes, not guaranteed physical space savings.
+> Pilot 0.2.0 is read-only. Project-specific commands can be reviewed and copied, but DevSpace never executes them or changes scanned files. Candidate sizes are logical bytes, not guaranteed physical space savings.
 
-## Pilot 0.1.1
+## Pilot 0.2.0
 
-Fixes six reviewed issues: protected descendants inside aggregates; explicit-cache recognition with automatic inclusion off; npm configuration parsing; the macOS uv cache default; linked wrapper-marker ancestors; and pagination after protection changes. See [review fixes and trade-offs](docs/REVIEW_001_FIXES.md).
+Follow measured space into individual folders, see the evidence and prerequisites behind a project-specific review plan, and rescan the same scope to measure changes. A fresh scan captures the new folder breakdown and recovery evidence; older reports remain readable.
 
 ## Features
 
 - Clickable ecosystem storage map, searchable findings, project inventory and scan coverage.
+- Storage drill-down includes unclassified files, child-folder sizes, direct-file totals and up to five large file samples per retained folder.
+- Project review plans identify wrappers, lockfiles, package-manager evidence, local dependencies and recovery obstacles. Each explains the next step, recovery and tradeoffs; commands are copy-only.
+- Overview prioritizes findings with a clearer recovery path, then size. Protection and incomplete measurements remain excluded from candidates.
+- Same-scope rescan comparison shows total changes and changed finding paths. Incomplete scans cannot establish a new baseline or appear as savings.
 - Gradle caches/wrappers, Maven repositories/output, npm/npx storage, Node dependencies, known pnpm/Yarn locations, Python environments and pip/uv caches.
 - Project discovery from Java/Node/Python manifests and Git markers; scoped Gradle wrapper references.
 - Evidence, recovery notes, conservative protection and saved personal protection preferences.
@@ -58,7 +62,9 @@ The scanner executes no project code, build script, package-manager command or G
 
 Only selected roots plus optionally included caches are traversed. Configuration discovery reads bounded user settings for identity even with automatic inclusion off; unrelated cache contents are not scanned. The coverage view lists effective roots separately from recognized overlapping cache identities. Invalid explicit configuration produces redacted diagnostics, not silent fallback guesses.
 
-Only known bounded manifest/configuration fields are read. No arbitrary source contents, `.env` values or executable contents are exported. Opening a folder and exporting a new report are explicit actions; exports refuse to overwrite existing files. Full reports contain potentially sensitive metadata; the default redacted summary withholds free-text paths, names, branches and evidence. Scan reports remain in memory unless exported. Preferences stay local.
+Only known bounded manifest/configuration fields are read. No arbitrary source contents, `.env` values or executable contents are exported. Opening a folder and exporting a new report are explicit actions; exports refuse to overwrite existing files. Full reports contain potentially sensitive metadata; the default redacted summary withholds free-text paths, names, branches and evidence. Full reports remain in memory unless exported. A compact baseline with paths, sizes, scope and timestamp is saved locally for the next comparison; preferences also stay local.
+
+Folder detail is bounded to 10,000 directories plus any remaining scan roots, an approximate 4 MiB detail budget and five file samples per retained directory. Bytes outside retained detail still count in the measured totals. Comparison retains at most 5,000 finding paths within a 1.5-million-character snapshot; omitted path detail is disclosed. A change in logical size does not prove what caused it or how much physical storage was freed.
 
 The pilot does not resolve complete dependency graphs, all Git branches, dirty/tracked state, remote availability, every running tool, physical allocation or complete container inventories. Project/CLI overrides, pip.ini and arbitrary Yarn/Gradle configuration are not evaluated. The scan is bounded to 5 million entries, 20,000 findings, 10,000 projects and 128 levels; at most 500 warning details are retained.
 

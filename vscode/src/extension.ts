@@ -8,11 +8,12 @@ import { paths, record, scanRequest } from './protocol';
 import { exportContent, writeNewReport } from './export';
 import type { Report } from '../../src/types';
 import type { ScanScope } from '../../src/scanScope';
+import { makeSnapshot, readSnapshot, type ScanSnapshot } from '../../src/scanComparison';
 
-type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
+type Tab = 'overview' | 'storage' | 'findings' | 'projects' | 'coverage';
 type Action = { tab?: Tab; scanRoots?: string[]; cancel?: boolean; availability?: string };
 type Preferences = { roots: string[]; protectedPaths: string[]; includeCaches: boolean };
-const tabs: [Tab, string, string][] = [['overview', 'Overview', 'dashboard'], ['findings', 'Findings', 'list-unordered'], ['projects', 'Projects', 'folder'], ['coverage', 'Scan coverage', 'shield']];
+const tabs: [Tab, string, string][] = [['overview', 'Overview', 'dashboard'], ['storage', 'Storage', 'database'], ['findings', 'Findings', 'list-unordered'], ['projects', 'Projects', 'folder'], ['coverage', 'Scan coverage', 'shield']];
 
 function unavailable(): string {
   if (vscode.env.remoteName) return 'This first release scans local folders in a local VS Code window. Open a local window to use DevSpace.';
@@ -51,6 +52,8 @@ export class Analyzer implements vscode.Disposable {
   private pending?: Action;
   private report?: Report;
   private reportScope?: ScanScope;
+  private baseline: ScanSnapshot | null = null;
+  private comparisonBaseline: ScanSnapshot | null = null;
   private readonly scanner: Scanner;
   private readonly navigation = new Navigation();
   private readonly tree: vscode.TreeView<vscode.TreeItem>;
@@ -60,6 +63,7 @@ export class Analyzer implements vscode.Disposable {
   private preferenceWrite: Promise<void> = Promise.resolve();
 
   constructor(private readonly context: vscode.ExtensionContext) {
+    this.baseline = readSnapshot(context.workspaceState.get('baseline'));
     const roots = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath).slice(0, 32) ?? [];
     const saved = context.workspaceState.get<{ roots: string[]; includeCaches: boolean }>('scope');
     this.preferences = { roots: saved?.roots ?? roots, includeCaches: saved?.includeCaches ?? false, protectedPaths: context.globalState.get<string[]>('protectedPaths', []) };
@@ -115,7 +119,7 @@ export class Analyzer implements vscode.Disposable {
     const nonce = randomBytes(24).toString('base64');
     const script = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', 'index.js'));
     const style = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', 'index.css'));
-    const bootstrap = JSON.stringify({ ...this.preferences, report: this.report, reportScope: this.reportScope, unavailable: unavailable() }).replace(/</g, '\\u003c');
+    const bootstrap = JSON.stringify({ ...this.preferences, report: this.report, reportScope: this.reportScope, baseline: this.baseline, comparisonBaseline: this.comparisonBaseline, unavailable: unavailable() }).replace(/</g, '\\u003c');
     panel.webview.html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${panel.webview.cspSource} data:; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${panel.webview.cspSource}; connect-src 'none';"><title>DevSpace Analyzer</title><link rel="stylesheet" href="${escapeAttribute(style.toString())}"></head><body><div id="root"></div><script type="application/json" id="devspace-bootstrap">${bootstrap}</script><script nonce="${nonce}" type="module" src="${escapeAttribute(script.toString())}"></script></body></html>`;
     const active = new Set<number>();
     const messages = panel.webview.onDidReceiveMessage(async (message: unknown) => {
@@ -166,11 +170,33 @@ export class Analyzer implements vscode.Disposable {
         void vscode.commands.executeCommand('setContext', 'devspace.scanning', true);
         try {
           const result = await this.scanner.scan(request, progress => this.event('scan-progress', progress));
+          this.comparisonBaseline = this.baseline;
           this.report = result; this.reportScope = { roots: request.roots, includeCaches: request.includeGlobalCaches };
+          const snapshot = makeSnapshot(result, this.reportScope);
+          if (snapshot) {
+            this.baseline = snapshot;
+            await this.context.workspaceState.update('baseline', snapshot).then(undefined, () => vscode.window.showWarningMessage('The scan completed, but its comparison baseline could not be saved for the next session.'));
+          }
           this.navigation.description = `${result.cancelled ? 'Cancelled' : result.complete ? 'Complete' : 'Partial'} · ${result.findings.length} findings · ${result.projects.length} projects`;
           return result;
         } catch (error) { this.navigation.description = this.report ? 'Scan failed · previous report retained' : 'Scan failed'; throw error; }
         finally { void vscode.commands.executeCommand('setContext', 'devspace.scanning', false); this.navigation.refresh(); }
+      }
+      case 'copy_text': {
+        if (typeof args.text !== 'string' || args.text.length > 8192) throw new Error('Invalid clipboard text.');
+        await vscode.env.clipboard.writeText(args.text); return null;
+      }
+      case 'reveal_storage': {
+        requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
+        const directory = this.report?.storage?.directories.find(d => d.id === args.id);
+        if (!directory) throw new Error('Folder is not in the current scan.');
+        let cursor = directory.path;
+        for (;;) {
+          const stat = await lstat(cursor);
+          if (stat.isSymbolicLink()) throw new Error('This location now contains a link. Scan again before opening it.');
+          const parent = path.dirname(cursor); if (parent === cursor) break; cursor = parent;
+        }
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(directory.path)); return null;
       }
       case 'cancel_scan': this.scanner.cancel(); return null;
       case 'reveal_finding': {

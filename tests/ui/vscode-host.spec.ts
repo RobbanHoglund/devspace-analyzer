@@ -57,9 +57,9 @@ for (const width of [380, 760, 1440]) {
     await expect(page.getByText('Settings changed', { exact: false })).toHaveCount(0);
     await page.getByRole('button', { name: 'Scan settings', exact: true }).click();
     await expect(page.getByText('Browser preview', { exact: false })).toHaveCount(0);
-    await expect(page.getByRole('navigation')).toHaveCount(0);
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0);
     await page.screenshot({ path: `test-results/vscode-overview-${width}.png`, fullPage: true });
-    for (const [tab, name] of [['overview', 'Overview'], ['findings', 'Findings'], ['projects', 'Projects'], ['coverage', 'Scan coverage']]) {
+    for (const [tab, name] of [['overview', 'Overview'], ['storage', 'Storage'], ['findings', 'Findings'], ['projects', 'Projects'], ['coverage', 'Scan coverage']]) {
       await page.evaluate(tab => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab } } })), tab);
       await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
       const overflow = await page.evaluate(() => ({

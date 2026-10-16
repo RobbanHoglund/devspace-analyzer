@@ -3,6 +3,8 @@ use crate::{config::{self, Environment}, model::*, paths::{display, git_marker, 
 mod rules;
 mod scope;
 mod gradle;
+mod storage;
+mod evidence;
 
 const MAX_ENTRIES: u64 = 5_000_000;
 const MAX_DEPTH: usize = 128;
@@ -77,7 +79,7 @@ fn project(root: &Path, index: usize) -> Option<Project> {
     Some(Project {
         id: format!("p{index}"), name: root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| display(root)), path: display(root),
         ecosystems, markers, lockfiles: LOCKS.iter().filter(|m| regular(&root.join(m))).map(|s| s.to_string()).collect(),
-        git_kind, branch, wrapper_version: wrapper_version(root), workspace, context_only: false, owned_logical_bytes: 0, artifact_bytes: 0,
+        git_kind, branch, wrapper_version: wrapper_version(root), workspace, context_only: false, owned_logical_bytes: 0, artifact_bytes: 0, recovery_evidence: Some(evidence::recovery_evidence(root)),
     })
 }
 /// Interpret only CPython's tagged cache filenames. Strip the suffix from the
@@ -122,7 +124,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
     // later roots.extend() determines whether unrelated caches are traversed.
     let discovery = config::discover_with_warnings(env);
     let report = Report {
-        schema_version: 1, started_at: now(), duration_ms: 0, roots: vec![], global_caches: discovery.locations,
+        schema_version: 2, storage: StorageInventory::default(), started_at: now(), duration_ms: 0, roots: vec![], global_caches: discovery.locations,
         findings: vec![], projects: vec![], progress: Progress::default(), warnings: vec![], warning_count: 0,
         complete: true, cancelled: false, size_basis: "Logical file lengths, not physical or guaranteed reclaimable bytes".into(),
         limitations: vec![
@@ -136,7 +138,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
             "At most 5 million entries, 20,000 findings, 10,000 projects and 128 directory levels are scanned. At most 500 warning details are retained.".into(),
         ],
     };
-    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![], gradle_modules: Default::default(), gradle_checked: Default::default() };
+    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![], gradle_modules: Default::default(), gradle_checked: Default::default(), storage_stack: vec![], storage_bytes: 0, classified_bytes: 0 };
     for raw in request.protected_paths {
         match normalize(Path::new(&raw)) {
             Ok(path) => s.protected.push(path),
@@ -171,6 +173,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
 struct Scanner<'a, F: FnMut(Progress)> {
     report: Report, cancelled: &'a AtomicBool, callback: F, start: Instant,
     last_emit: Instant, stopped: bool, protected: Vec<PathBuf>,
+    storage_stack: Vec<Option<usize>>, storage_bytes: usize, classified_bytes: u64,
     gradle_modules: std::collections::BTreeMap<String, PathBuf>, gradle_checked: BTreeSet<String>,
 }
 impl<F: FnMut(Progress)> Scanner<'_, F> {
@@ -204,7 +207,9 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             self.warn(path, "policy-excluded", "Sensitive/system directory excluded by the default policy."); true
         } else { false }
     }
-    fn file_size(&mut self, meta: &fs::Metadata) -> Size {
+    fn file_size(&mut self, path: &Path, meta: &fs::Metadata, classified: bool) -> Size {
+        self.retain_file(path, meta.len(), classified);
+        if classified { self.classified_bytes = self.classified_bytes.saturating_add(meta.len()); }
         self.report.progress.files += 1;
         self.report.progress.logical_bytes = self.report.progress.logical_bytes.saturating_add(meta.len());
         Size { bytes: meta.len(), files: 1, modified: meta.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|t| t.as_secs()), ..Size::default() }
@@ -230,7 +235,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             }
         }
         if meta.is_file() {
-            let mut size = self.file_size(&meta);
+            let mut size = self.file_size(path, &meta, true);
             self.charge(owner, size.bytes, owner == aggregate.owner && aggregate.artifact);
             size.add(boundary); return size;
         }
@@ -244,7 +249,8 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return Size::missing(); }
             if let Some(p) = self.project_at(path, self.report.projects.len()) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
         }
-        let entries = match fs::read_dir(path) { Ok(e) => e, Err(e) => { self.warn(path, "directory-unavailable", &e.to_string()); return Size::missing(); } };
+        let checkpoint = self.enter_directory(path);
+        let entries = match fs::read_dir(path) { Ok(e) => e, Err(e) => { self.warn(path, "directory-unavailable", &e.to_string()); self.leave_directory(checkpoint); return Size::missing(); } };
         let guarded = protected_parent || boundary.protected_path_count > 0;
         let mut total = boundary;
         for entry in entries {
@@ -254,6 +260,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
                 Err(e) => { self.warn(path, "entry-unavailable", &e.to_string()); total.incomplete = true; }
             }
         }
+        self.leave_directory(checkpoint);
         total
     }
     fn visit(&mut self, path: &Path, owner: Option<usize>, depth: usize, context: Option<Rule>) {
@@ -281,7 +288,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             });
             return;
         }
-        if meta.is_file() { let size = self.file_size(&meta); self.charge(owner, size.bytes, false); return; }
+        if meta.is_file() { let size = self.file_size(path, &meta, false); self.charge(owner, size.bytes, false); return; }
         if !meta.is_dir() { self.warn(path, "special-file", "Special filesystem entry was not opened."); return; }
         if self.excluded(path) { return; }
         self.report.progress.directories += 1;
@@ -290,6 +297,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return; }
             next_owner = Some(self.report.projects.len()); self.report.projects.push(p);
         }
+        let checkpoint = self.enter_directory(path);
         match fs::read_dir(path) {
             Ok(entries) => for entry in entries {
                 if self.halted() { break; }
@@ -297,5 +305,6 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             },
             Err(e) => self.warn(path, "directory-unavailable", &e.to_string()),
         }
+        self.leave_directory(checkpoint);
     }
 }

@@ -18,6 +18,7 @@ function put(relative, content) {
   writeFileSync(path, content);
 }
 put('service/build.gradle.kts', '// Static project marker\n');
+put('service/gradlew.bat', '@echo NEVER EXECUTE THIS TEST FIXTURE\n');
 put('service/.git/HEAD', 'ref: refs/heads/main\n');
 put('service/build/classes/output.bin', Buffer.alloc(2048, 1));
 put('web/package.json', '{"name":"native-fixture-web"}');
@@ -106,6 +107,29 @@ try {
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(artifacts, 'native-findings.png'), fullPage: true });
   expect(snapshot(workspace)).toEqual(before);
+  await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
+  await page.getByRole('button', { name: 'Storage', exact: true }).click();
+  const storage = page.getByRole('region', { name: 'Storage breakdown' });
+  for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.locator('.storage-folder').filter({ hasText: folder }).click();
+  await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
+  await expect(storage.locator('.storage-file')).toContainText('2 KiB');
+  await page.screenshot({ path: join(artifacts, 'native-storage.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await page.getByRole('button', { name: 'Review build', exact: true }).click();
+  const plan = page.getByRole('region', { name: 'Project review plan' });
+  await expect(plan).toContainText('gradlew.bat found');
+  await plan.locator('summary').click();
+  await expect(plan.locator('code')).toHaveText('.\\gradlew.bat clean');
+  await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  // A deliberate test-only edit verifies the difference between two real scans.
+  put('service/build/classes/output.bin', Buffer.alloc(1024, 1));
+  const changed = snapshot(workspace);
+  const comparison = page.getByRole('region', { name: 'Changes since previous scan' });
+  await comparison.getByRole('button', { name: 'Rescan the same scope' }).click();
+  await expect(comparison).toContainText('1 KiB less measured', { timeout: 30000 });
+  expect(snapshot(workspace)).toEqual(changed);
+  await page.screenshot({ path: join(artifacts, 'native-comparison.png'), fullPage: true });
   expect(errors).toEqual([]);
   const result = {
     passed: true, revision: process.env.GITHUB_SHA ?? 'local',
@@ -116,6 +140,8 @@ try {
       'Nested project Inspect shows the enclosing protected aggregate',
       'Personal protection interaction', 'Close details and restore finding focus', 'VHDX and nested Git protect enclosing build aggregate',
       'Intrinsic protection cannot be removed by personal-protection toggle',
+      'Native storage drill-down and file sample', 'Detected wrapper yields a copy-only review command',
+      'Second real scan measures the exact test-only 1 KiB change',
       'Fixture content and modification times unchanged', 'No observed page errors'],
     notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation']
   };

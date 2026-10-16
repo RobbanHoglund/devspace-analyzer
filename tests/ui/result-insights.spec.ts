@@ -20,7 +20,7 @@ test('the takeaway explains Gradle storage and connects all measured bytes to re
   await expect(summary).toContainText('6 GiB measured');
   await expect(summary.getByRole('button', { name: /Other measured files/ })).toContainText('4 GiB');
   await summary.getByRole('button', { name: /Other measured files/ }).click();
-  await expect(page.getByRole('region', { name: 'Unclassified measured data' })).toContainText('did not match a supported');
+  await expect(page.getByRole('region', { name: 'Storage breakdown' })).toContainText('did not match a supported');
   await navigate(page, 'Overview');
   await insights.getByRole('button', { name: 'Review build', exact: true }).click();
   await expect(page.getByRole('region', { name: 'Suggested review step' })).toContainText('configured build outputs');
