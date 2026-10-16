@@ -54,7 +54,7 @@ export async function run(): Promise<void> {
     const storage = view.getByRole('region', { name: 'Storage breakdown' });
     await storage.waitFor();
     await waitFor(() => api.getStatus().activeTab === 'storage' && api.getStatus().selectedTab === 'storage', 'Native sidebar did not follow Storage');
-    for (const folder of ['workspace', 'node_modules', 'example']) await storage.locator('.storage-folder').filter({ hasText: folder }).click();
+    for (const folder of ['workspace', 'node_modules', 'example']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
     await storage.getByText('index.js', { exact: true }).waitFor();
     assert.equal(await storage.getByRole('button', { name: 'Open folder', exact: true }).isEnabled(), true);
     await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-storage.png`) });
@@ -74,6 +74,8 @@ export async function run(): Promise<void> {
     await comparison.getByText('1 KiB more measured', { exact: true }).waitFor();
     assert.deepEqual(await readFile(fixtureFile), changed.bytes); assert.equal((await stat(fixtureFile)).mtimeMs, changed.mtime);
     await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-comparison.png`) });
+    await vscode.commands.executeCommand('devspace.storage');
+    await storage.getByRole('button', { name: /^Open folder: workspace,/ }).click();
     const themes: [string, string][] = [['Default Dark Modern', 'vscode-dark'], ['Default Light Modern', 'vscode-light'], ['Default High Contrast', 'vscode-high-contrast'], ['Default High Contrast Light', 'vscode-high-contrast-light']];
     for (const [name, css] of themes) {
       await vscode.workspace.getConfiguration('workbench').update('colorTheme', name, vscode.ConfigurationTarget.Global);

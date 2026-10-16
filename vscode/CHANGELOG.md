@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+- Interactive folder treemap in Storage: click into folders, explore smaller-item groups and file samples, and navigate back with breadcrumbs or Up.
+- Overview distribution donut includes unclassified measured files and opens the matching findings or folder view.
+- Charts preserve measured totals through filters and missing detail, adapt to editor width and theme, and support keyboard navigation.
+
 ## 0.1.1
 
 - Explain each scan with a clear takeaway and concrete checks for its largest review candidates.

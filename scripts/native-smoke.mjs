@@ -110,7 +110,7 @@ try {
   await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
   await page.getByRole('button', { name: 'Storage', exact: true }).click();
   const storage = page.getByRole('region', { name: 'Storage breakdown' });
-  for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.locator('.storage-folder').filter({ hasText: folder }).click();
+  for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
   await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
   await expect(storage.locator('.storage-file')).toContainText('2 KiB');
   await page.screenshot({ path: join(artifacts, 'native-storage.png'), fullPage: true });

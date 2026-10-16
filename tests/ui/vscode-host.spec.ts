@@ -62,6 +62,12 @@ for (const width of [380, 760, 1440]) {
     for (const [tab, name] of [['overview', 'Overview'], ['storage', 'Storage'], ['findings', 'Findings'], ['projects', 'Projects'], ['coverage', 'Scan coverage']]) {
       await page.evaluate(tab => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab } } })), tab);
       await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
+      if (tab === 'storage') {
+        const map = page.getByRole('region', { name: 'Interactive folder map' });
+        await map.getByRole('button', { name: /^Open folder: Workspaces,/ }).click();
+        await expect(map.getByRole('button', { name: /^Open folder: shopfront,/ })).toBeVisible();
+        await page.screenshot({ path: `test-results/vscode-storage-${width}.png`, fullPage: true });
+      }
       const overflow = await page.evaluate(() => ({
         width: innerWidth, document: document.documentElement.scrollWidth,
         elements: [...document.querySelectorAll('body *')].map(e => ({ tag:e.tagName, class:e.className, x:e.getBoundingClientRect().x, right:e.getBoundingClientRect().right })).filter(e => e.right > innerWidth + 1).slice(0,20),

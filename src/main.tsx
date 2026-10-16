@@ -5,4 +5,5 @@ import './styles.css';
 import './vscode.css';
 import './results.css';
 import './decisions.css';
+import './storage-charts.css';
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);
