@@ -63,7 +63,7 @@ export async function run(): Promise<void> {
     await waitFor(() => api.getStatus().activeTab === 'findings' && api.getStatus().selectedTab === 'findings', 'Native sidebar did not follow the active result view');
     await view.locator('.finding-button').first().click();
     await view.getByRole('heading', { name: /Node dependencies/ }).waitFor();
-    await view.getByRole('region', { name: 'Project review plan' }).getByText('package.json read successfully', { exact: true }).waitFor();
+    await view.getByRole('region', { name: 'Project review plan' }).locator('.evidence-checks li').filter({ hasText: 'package.json read successfully' }).waitFor();
     await view.getByRole('button', { name: 'Close finding details' }).click();
     // Only the disposable test fixture is changed, to verify an actual scanner delta.
     await writeFile(fixtureFile, Buffer.concat([before.bytes, Buffer.alloc(1024, 1)]));
