@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.3
+
+- Large folder tiles show a clickable preview of their immediate contents, preserving measured totals and explicitly accounting for missing detail.
+- One exact-value list sits beside the map in wide editors and below it in narrow editors. Hover and keyboard focus link the matching rows and map areas.
+- Map groups show their own list; folder review links, list pagination, Back/Forward and Up work with direct subfolder navigation.
+
 ## 0.2.2
 
 - One Back/Forward history for views, folders and map groups, restoring filters, focus and scroll position. New scans start a new history; demo history stays separate.

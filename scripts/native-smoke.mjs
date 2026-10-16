@@ -110,6 +110,11 @@ try {
   await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
   await page.getByRole('button', { name: 'Storage', exact: true }).click();
   const storage = page.getByRole('region', { name: 'Storage breakdown' });
+  const nestedService = storage.getByRole('group', { name: 'Inside workspace' }).getByRole('button', { name: /^Open subfolder: service,/ });
+  await nestedService.focus(); await page.keyboard.press('Enter');
+  await expect(storage.getByRole('navigation', { name: 'Storage path' }).locator('[aria-current]')).toHaveText('service');
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await expect(nestedService).toBeFocused();
   for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
   await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Go back', exact: true }).click();

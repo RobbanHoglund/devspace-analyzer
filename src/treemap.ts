@@ -1,6 +1,7 @@
 export interface MapEntry {
   id: string; name: string; value: number; kind: 'folder' | 'files' | 'file' | 'remainder' | 'filtered' | 'group';
   path?: string; detail: string; partial?: boolean; children?: MapEntry[];
+  preview?: MapEntry[]; files?: number;
 }
 export interface MapRect { entry: MapEntry; x: number; y: number; width: number; height: number }
 export const sumEntries = (entries: MapEntry[]) => entries.reduce((sum, entry) => sum + entry.value, 0);

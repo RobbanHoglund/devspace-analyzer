@@ -54,6 +54,14 @@ export async function run(): Promise<void> {
     const storage = view.getByRole('region', { name: 'Storage breakdown' });
     await storage.waitFor();
     await waitFor(() => api.getStatus().activeTab === 'storage' && api.getStatus().selectedTab === 'storage', 'Native sidebar did not follow Storage');
+    const workspacePreview = storage.getByRole('group', { name: 'Inside workspace' });
+    const nestedNode = workspacePreview.getByRole('button', { name: /^Open subfolder: node_modules,/ });
+    await nestedNode.focus();
+    await view.page().keyboard.press('Enter');
+    await storage.getByRole('button', { name: /^Open folder: example,/ }).waitFor();
+    await view.getByRole('button', { name: 'Go back', exact: true }).click();
+    await nestedNode.waitFor();
+    assert.equal(await nestedNode.evaluate(el => el === el.ownerDocument.activeElement), true);
     for (const folder of ['workspace', 'node_modules', 'example']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
     await storage.getByText('index.js', { exact: true }).waitFor();
     await view.getByRole('button', { name: 'Go back', exact: true }).click();
