@@ -76,6 +76,16 @@ class ReleaseTests(unittest.TestCase):
         for target in r.TARGETS:
             r.validate_vsix(package(target), VERSION, target, SHA)
 
+    def test_windows_license_line_endings_preserve_content_but_changes_are_rejected(self):
+        with zipfile.ZipFile(io.BytesIO(package('win32-x64'))) as archive:
+            files = {name: archive.read(name) for name in archive.namelist()}
+        for name in ('extension/LICENSE.txt', 'extension/NOTICE'):
+            files[name] = files[name].replace(b'\r\n', b'\n').replace(b'\n', b'\r\n')
+        r.validate_vsix(zipped(files), VERSION, 'win32-x64', SHA)
+        files['extension/LICENSE.txt'] += b'changed terms'
+        with self.assertRaises(ValueError):
+            r.validate_vsix(zipped(files), VERSION, 'win32-x64', SHA)
+
     def test_wrong_revision_platform_preview_and_corrupt_artifact_are_rejected(self):
         for data in (package('win32-x64', revision='b' * 40), package('win32-x64', preview=True), package('linux-x64')):
             with self.assertRaises(ValueError):

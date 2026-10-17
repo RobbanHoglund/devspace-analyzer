@@ -25,6 +25,12 @@ def digest(data):
     return 'sha256:' + hashlib.sha256(data).hexdigest()
 
 
+def license_text(data):
+    # Git for Windows may check text out with CRLF. Validate the full license
+    # content without requiring the Linux and Windows line endings to match.
+    return data.decode('utf-8').replace('\r\n', '\n')
+
+
 def command(*args, input_data=None):
     return subprocess.run(args, input=input_data, check=True, capture_output=True).stdout
 
@@ -96,8 +102,8 @@ def validate_vsix(data, version, target, sha):
         # vsce normalizes LICENSE to LICENSE.txt and records its actual path.
         license_path = manifest.findtext('.//{*}License')
         require(license_path in ('extension/LICENSE', 'extension/LICENSE.txt'), 'Missing VSIX license reference.')
-        require(package.read(license_path) == (ROOT / 'LICENSE').read_bytes(), 'Incorrect bundled LICENSE.')
-        require(package.read('extension/NOTICE') == (ROOT / 'NOTICE').read_bytes(), 'Incorrect bundled NOTICE.')
+        require(license_text(package.read(license_path)) == license_text((ROOT / 'LICENSE').read_bytes()), 'Incorrect bundled LICENSE.')
+        require(license_text(package.read('extension/NOTICE')) == license_text((ROOT / 'NOTICE').read_bytes()), 'Incorrect bundled NOTICE.')
         require(len(package.read('extension/THIRD_PARTY_NOTICES.txt')) > 100, 'Third-party notices missing.')
         scanner = 'devspace-scan.exe' if target == 'win32-x64' else 'devspace-scan'
         require(package.getinfo(f'extension/bin/{scanner}').file_size > 0, 'Scanner missing.')
