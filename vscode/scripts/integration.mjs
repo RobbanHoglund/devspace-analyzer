@@ -33,7 +33,7 @@ try {
   if (install.status !== 0) throw new Error('VSIX installation failed.');
   const options = {
     vscodeExecutablePath: executable, extensionDevelopmentPath: path.join(extensionRoot, 'test', 'harness'),
-    extensionTestsPath: path.join(extensionRoot, 'dist', 'vscode', 'test', 'integration.js'),
+    extensionTestsPath: path.join(extensionRoot, 'dist', 'vscode', 'test', process.env.DEVSPACE_VSCODE_VERSION ? 'minimum.js' : 'integration.js'),
     extensionTestsEnv: { npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, npm_config_cache: npmCache, NPM_CONFIG_CACHE: npmCache, DEVSPACE_TEST_ROOT: temporary, DEVSPACE_RESTRICTED: restricted ? '1' : '0', DEVSPACE_ARTIFACTS: path.join(root, 'artifacts', process.env.DEVSPACE_VSCODE_VERSION ? 'minimum-vscode' : '.') },
     launchArgs: [fixture, '--extensions-dir', extensions, '--user-data-dir', profile, '--skip-welcome', '--skip-release-notes', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=9228', ...(restricted ? [] : ['--disable-workspace-trust'])],
   };

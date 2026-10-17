@@ -25,7 +25,7 @@ Local validation includes Rust unit/regression suites, 62 frontend unit tests,
 77 browser interaction tests, 9 host/protocol tests, production/typecheck build and
 VSIX package inspection. CI builds and tests the installed extension on Windows
 x64, Linux x64, macOS x64 and arm64, plus Linux Restricted Mode and the declared
-minimum VS Code 1.85.0. Evidence is attached to the exact revision's workflow runs
+minimum VS Code 1.85.0 (installed activation, real webview startup, read-only scan, all view commands and reopening; the full browser-driven UI suite runs on current VS Code). Evidence is attached to the exact revision's workflow runs
 and linked in the pull request. A green compile alone is not the release gate.
 
 The revised installed-extension tests inspect and copy guidance without changing
