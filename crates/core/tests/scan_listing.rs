@@ -8,7 +8,10 @@ fn put(path: &Path, data: &[u8]) {
 #[test]
 fn wide_listings_keep_project_markers_nested_git_and_exact_accounting() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("workspace");
+    // macOS temp paths may start with /var, a symlink to /private/var. The
+    // fixture must use the real path so it exercises listing, not link rejection.
+    let home = temp.path().canonicalize().unwrap();
+    let root = home.join("workspace");
     put(&root.join("package.json"), b"{}");
     // Both directories exceed the bounded name lookahead. Late markers must
     // still be recognized without retaining an entire directory in memory.
@@ -20,7 +23,7 @@ fn wide_listings_keep_project_markers_nested_git_and_exact_accounting() {
     let before = fs::metadata(root.join("package.json")).unwrap().modified().unwrap();
     let report = scan_with_environment(
         ScanRequest { roots: vec![root.to_string_lossy().into()], include_global_caches: false, protected_paths: vec![] },
-        &Environment { home: temp.path().to_path_buf(), platform: std::env::consts::OS.into(), vars: HashMap::new() },
+        &Environment { home, platform: std::env::consts::OS.into(), vars: HashMap::new() },
         &AtomicBool::new(false), |_| {},
     ).unwrap();
     assert!(report.complete);
@@ -37,11 +40,12 @@ fn wide_listings_keep_project_markers_nested_git_and_exact_accounting() {
 #[test]
 fn marker_hints_preserve_the_filesystems_case_sensitivity() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("workspace");
+    let home = temp.path().canonicalize().unwrap();
+    let root = home.join("workspace");
     put(&root.join("PACKAGE.JSON"), b"{}"); put(&root.join("node_modules/example/index.js"), b"fixture");
     let report = scan_with_environment(
         ScanRequest { roots: vec![root.to_string_lossy().into()], include_global_caches: false, protected_paths: vec![] },
-        &Environment { home: temp.path().to_path_buf(), platform: std::env::consts::OS.into(), vars: HashMap::new() },
+        &Environment { home, platform: std::env::consts::OS.into(), vars: HashMap::new() },
         &AtomicBool::new(false), |_| {},
     ).unwrap();
     assert!(report.complete); assert_eq!(report.progress.files, 2);
@@ -58,12 +62,13 @@ fn marker_hints_preserve_the_filesystems_case_sensitivity() {
 #[test]
 fn pipenv_projects_retain_mixed_case_manifest_and_lockfile_markers() {
     let temp = tempfile::tempdir().unwrap();
-    let root = temp.path().join("workspace");
+    let home = temp.path().canonicalize().unwrap();
+    let root = home.join("workspace");
     put(&root.join("pipenv/Pipfile"), b"[packages]\n");
     put(&root.join("pipenv/Pipfile.lock"), b"{}");
     let report = scan_with_environment(
         ScanRequest { roots: vec![root.to_string_lossy().into()], include_global_caches: false, protected_paths: vec![] },
-        &Environment { home: temp.path().to_path_buf(), platform: std::env::consts::OS.into(), vars: HashMap::new() },
+        &Environment { home, platform: std::env::consts::OS.into(), vars: HashMap::new() },
         &AtomicBool::new(false), |_| {},
     ).unwrap();
     assert!(report.complete); assert_eq!(report.progress.files, 2);
