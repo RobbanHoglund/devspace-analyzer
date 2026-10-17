@@ -4,6 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { lstat } from 'node:fs/promises';
 import { Scanner } from './scanner';
+import { Cleanup, cleanupRequest } from './cleanup';
 import { paths, record, scanRequest } from './protocol';
 import { exportContent, writeNewReport } from './export';
 import type { Report } from '../../src/types';
@@ -55,6 +56,7 @@ export class Analyzer implements vscode.Disposable {
   private baseline: ScanSnapshot | null = null;
   private comparisonBaseline: ScanSnapshot | null = null;
   private readonly scanner: Scanner;
+  private readonly cleanup: Cleanup;
   private readonly navigation = new Navigation();
   private readonly tree: vscode.TreeView<vscode.TreeItem>;
   private activeTab: Tab = 'overview';
@@ -69,6 +71,7 @@ export class Analyzer implements vscode.Disposable {
     this.preferences = { roots: saved?.roots ?? roots, includeCaches: saved?.includeCaches ?? false, protectedPaths: context.globalState.get<string[]>('protectedPaths', []) };
     const binary = path.join(context.extensionPath, 'bin', process.platform === 'win32' ? 'devspace-scan.exe' : 'devspace-scan');
     this.scanner = new Scanner(binary, context.extensionPath);
+    this.cleanup = new Cleanup(binary, context.extensionPath, text => this.event('cleanup-log', text));
     this.tree = vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation });
     this.disposables.push(this.tree, this.tree.onDidChangeVisibility(() => this.syncView()));
     this.disposables.push(vscode.workspace.onDidGrantWorkspaceTrust(() => this.event('host-action', { availability: unavailable() })));
@@ -76,7 +79,7 @@ export class Analyzer implements vscode.Disposable {
     for (const [tab] of tabs) this.register(`devspace.${tab}`, () => this.action({ tab }));
     this.register('devspace.scanWorkspace', async () => {
       requireLocal();
-      if (this.scanner.running) throw new Error('A scan is already running.');
+      if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
       const roots = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath) ?? [];
       if (roots.length) this.action({ scanRoots: paths(roots, 32) });
       else await this.scanFolder();
@@ -99,7 +102,7 @@ export class Analyzer implements vscode.Disposable {
   }
   private async scanFolder(uri?: vscode.Uri): Promise<void> {
     requireLocal();
-    if (this.scanner.running) throw new Error('A scan is already running.');
+    if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
     if (uri && uri.scheme !== 'file') throw new Error('Choose a local folder.');
     const selected = uri ? paths([uri.fsPath], 32) : await this.folders();
     if (selected?.length) this.action({ scanRoots: selected });
@@ -133,7 +136,7 @@ export class Analyzer implements vscode.Disposable {
       finally { active.delete(id); }
     });
     panel.onDidDispose(() => {
-      messages.dispose(); if (this.panel === panel) { this.panel = undefined; this.ready = false; this.pending = undefined; this.scanner.dispose(); }
+      messages.dispose(); if (this.panel === panel) { this.panel = undefined; this.ready = false; this.pending = undefined; this.scanner.dispose(); this.cleanup.dispose(); }
     });
   }
   private event(name: string, payload: unknown): void { if (this.panel) void this.panel.webview.postMessage({ type: 'event', name, payload }); }
@@ -154,7 +157,9 @@ export class Analyzer implements vscode.Disposable {
       case 'choose_folders': return this.folders();
       case 'save_preferences': {
         if (typeof args.includeCaches !== 'boolean') throw new Error('Invalid scan preferences.');
-        this.preferences = { roots: paths(args.roots, 32), protectedPaths: paths(args.protectedPaths, 20000), includeCaches: args.includeCaches };
+        const next = { roots: paths(args.roots, 32), protectedPaths: paths(args.protectedPaths, 20000), includeCaches: args.includeCaches };
+        if (this.cleanup.running && JSON.stringify(next.protectedPaths) !== JSON.stringify(this.preferences.protectedPaths)) throw new Error('Finish cleanup before changing protection.');
+        this.preferences = next;
         const saved = this.preferences;
         // Serialize memento writes so a slow prior update cannot restore stale choices.
         this.preferenceWrite = this.preferenceWrite.catch(() => {}).then(async () => {
@@ -165,7 +170,7 @@ export class Analyzer implements vscode.Disposable {
       }
       case 'scan': {
         requireLocal(); const request = scanRequest(args.request);
-        if (this.scanner.running) throw new Error('A scan is already running.');
+        if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
         this.navigation.description = 'Scanning…'; this.navigation.refresh();
         void vscode.commands.executeCommand('setContext', 'devspace.scanning', true);
         try {
@@ -186,6 +191,18 @@ export class Analyzer implements vscode.Disposable {
         if (typeof args.text !== 'string' || args.text.length > 8192) throw new Error('Invalid clipboard text.');
         await vscode.env.clipboard.writeText(args.text); return null;
       }
+      case 'prepare_cleanup': {
+        requireLocal();
+        if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
+        if (this.report?.findings.find(f => f.id === args.id)?.path !== args.expectedPath) throw new Error('This finding changed. Scan again before cleanup.');
+        return this.cleanup.prepare(cleanupRequest(this.report, args.id, args.action, this.preferences.protectedPaths));
+      }
+      case 'run_cleanup': {
+        requireLocal();
+        try { return await this.cleanup.run(args.id); }
+        finally { this.report = undefined; this.navigation.description = 'Scan again after cache maintenance'; this.navigation.refresh(); }
+      }
+      case 'cancel_cleanup': return this.cleanup.cancel();
       case 'reveal_storage': {
         requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
         const directory = this.report?.storage?.directories.find(d => d.id === args.id);
@@ -219,7 +236,7 @@ export class Analyzer implements vscode.Disposable {
   }
   /** Non-sensitive lifecycle status for consumers and integration checks. Reports stay in memory. */
   getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete, activeTab: this.activeTab, selectedTab: this.tree.selection[0]?.id }; }
-  dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
+  dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.cleanup.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
 }
 
 let analyzer: Analyzer | undefined;

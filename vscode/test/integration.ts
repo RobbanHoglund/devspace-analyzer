@@ -99,6 +99,32 @@ export async function run(): Promise<void> {
       await waitFor(() => view.locator(`body.${css}`).count().then(n => n === 1), `Theme ${name} not applied`);
       await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-${css}.png`) });
     }
+    // Exercise the new action through the installed webview and bundled worker.
+    const npmCache = path.join(temporary, 'npm-cache');
+    await vscode.commands.executeCommand('devspace.scanFolder', vscode.Uri.file(npmCache));
+    const maintenance = view.getByRole('region', { name: 'Cache maintenance' }); await maintenance.waitFor();
+    await maintenance.getByRole('button', { name: 'Review cleanup →' }).click();
+    const preview = view.getByRole('dialog', { name: 'Review before running' });
+    await preview.getByRole('radio', { name: /Clear npm package cache/ }).check();
+    await preview.getByRole('button', { name: 'Prepare preview' }).click();
+    await preview.getByRole('button', { name: 'Run cleanup', exact: true }).waitFor();
+    assert.equal((await readFile(path.join(npmCache, '_cacache', 'fixture'))).length, 2048, 'Preview must not clean');
+    for (const [name, css] of themes) {
+      await vscode.workspace.getConfiguration('workbench').update('colorTheme', name, vscode.ConfigurationTarget.Global);
+      await waitFor(() => view.locator(`body.${css}`).count().then(n => n === 1), `Cleanup theme ${name} not applied`);
+      await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-cleanup-${css}.png`) });
+    }
+    await preview.getByRole('button', { name: 'Run cleanup', exact: true }).click();
+    const result = view.getByRole('dialog', { name: 'Maintenance result' });
+    await result.getByRole('heading', { name: 'Command completed', exact: true }).waitFor();
+    await waitFor(() => result.getByRole('button', { name: 'Done', exact: true }).isEnabled(), 'Cleanup did not refresh its scan');
+    assert.ok((await result.getByRole('region', { name: 'Cleanup result' }).innerText()).includes('0 B'));
+    await assert.rejects(readFile(path.join(npmCache, '_cacache', 'fixture')), { code: 'ENOENT' });
+    assert.deepEqual(await readFile(fixtureFile), changed.bytes, 'Cleanup must not touch the adjacent workspace');
+    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-cleanup-result.png`) });
+    await result.getByRole('button', { name: 'Done', exact: true }).click();
+    await vscode.commands.executeCommand('devspace.scanWorkspace');
+    await waitFor(() => api.getStatus().complete && api.getStatus().projects === 1, 'Workspace scan after cleanup failed');
     await vscode.commands.executeCommand('devspace.projects');
     await view.getByRole('heading', { name: /^Projects/ }).first().waitFor();
     await vscode.commands.executeCommand('devspace.coverage');
@@ -107,6 +133,6 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.open');
     await waitFor(() => api.getStatus().ready, 'Reopened view did not restore');
     assert.ok(api.getStatus().findings >= 1);
-    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, storageDrilldown: true, navigationHistory: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
+    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, nativeCleanup: true, cleanupBeforeBytes: 2048, cleanupAfterBytes: 0, storageDrilldown: true, navigationHistory: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
   } finally { await browser.close(); }
 }

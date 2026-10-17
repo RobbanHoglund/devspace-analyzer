@@ -59,7 +59,10 @@ export function readPreference(key: string): string[] {
 }
 export async function savePreferences(roots: string[], protectedPaths: string[], includeCaches: boolean): Promise<void> {
   if (api) await invoke('save_preferences', { roots, protectedPaths, includeCaches });
-  else { localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths)); }
+  else {
+    if (native) await invoke('save_preferences', { protectedPaths });
+    localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths));
+  }
 }
 
 export function readBaseline(): ScanSnapshot | null {

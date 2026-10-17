@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DevSpace Analyzer",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "identifier": "se.devspace.analyzer",
   "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": {
@@ -13,7 +13,7 @@
   },
   "bundle": {
     "active": true, "targets": ["nsis"], "icon": ["icons/icon.png", "icons/icon.ico"],
-    "shortDescription": "Read-only disk intelligence for developers",
+    "shortDescription": "Developer disk intelligence and opt-in cache maintenance",
     "windows": { "nsis": { "installMode": "currentUser" } }
   }
 }

@@ -1,8 +1,8 @@
 {
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
-  "description": "Local, read-only analysis of developer projects, build output and shared caches.",
-  "version": "0.2.3",
+  "description": "Local developer storage analysis with explicit npm, pnpm and pip cache maintenance.",
+  "version": "0.3.0",
   "publisher": "RobbanHoglund",
   "license": "UNLICENSED",
   "repository": {
@@ -57,7 +57,7 @@
       },
       {
         "command": "devspace.scanFolder",
-        "title": "Scan Folder…",
+        "title": "Scan Folder\u2026",
         "category": "DevSpace",
         "icon": "$(folder-opened)",
         "enablement": "isWorkspaceTrusted && !remoteName && !devspace.scanning"

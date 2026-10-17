@@ -43,10 +43,14 @@ function snapshot(root) {
   walk(root); return result;
 }
 const before = snapshot(workspace);
+const npmCache = join(temp, 'npm-cache');
+mkdirSync(join(npmCache, '_cacache'), { recursive: true });
+writeFileSync(join(npmCache, '_cacache', 'fixture'), Buffer.alloc(2048, 1));
+const npmrc = join(temp, 'npmrc'); writeFileSync(npmrc, '');
 const endpoint = 'http://127.0.0.1:9337';
 // CI child process only. The distributed application enables no debug endpoint.
 const child = spawn(executable, [], {
-  env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
+  env: { ...process.env, npm_config_cache: npmCache, NPM_CONFIG_CACHE: npmCache, npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 let processOutput = ''; let browser; let page; let processError; let lastProbe = '';
@@ -139,6 +143,28 @@ try {
   await expect(comparison).toContainText('1 KiB less measured', { timeout: 30000 });
   expect(snapshot(workspace)).toEqual(changed);
   await page.screenshot({ path: join(artifacts, 'native-comparison.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Scan settings', exact: true }).click();
+  await page.getByLabel('Add folder path').fill(npmCache);
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
+  const maintenance = page.getByRole('region', { name: 'Cache maintenance' });
+  await expect(maintenance).toBeVisible();
+  await maintenance.getByRole('button', { name: 'Review cleanup →' }).click();
+  const cleanup = page.getByRole('dialog', { name: 'Review before running' });
+  await cleanup.getByRole('radio', { name: /Clear npm package cache/ }).check();
+  await cleanup.getByRole('button', { name: 'Prepare preview' }).click();
+  await expect(cleanup.getByRole('button', { name: 'Run cleanup', exact: true })).toBeVisible();
+  expect(readFileSync(join(npmCache, '_cacache', 'fixture')).length).toBe(2048);
+  await page.screenshot({ path: join(artifacts, 'native-cleanup-preview.png') });
+  await cleanup.getByRole('button', { name: 'Run cleanup', exact: true }).click();
+  const cleanupResult = page.getByRole('dialog', { name: 'Maintenance result' });
+  await expect(cleanupResult.getByRole('heading', { name: 'Command completed', exact: true })).toBeVisible();
+  await expect(cleanupResult.getByRole('button', { name: 'Done', exact: true })).toBeEnabled();
+  await expect(cleanupResult.getByRole('region', { name: 'Cleanup result' })).toContainText('0 B');
+  expect(existsSync(join(npmCache, '_cacache', 'fixture'))).toBe(false);
+  expect(snapshot(workspace)).toEqual(changed);
+  await page.screenshot({ path: join(artifacts, 'native-cleanup-result.png') });
+  await cleanupResult.getByRole('button', { name: 'Done', exact: true }).click();
   expect(errors).toEqual([]);
   const result = {
     passed: true, revision: process.env.GITHUB_SHA ?? 'local',
@@ -151,6 +177,7 @@ try {
       'Intrinsic protection cannot be removed by personal-protection toggle',
       'Native storage drill-down and file sample', 'Detected wrapper yields a copy-only review command',
       'Second real scan measures the exact test-only 1 KiB change',
+      'Explicit npm cleanup preview and run; 2 KiB to zero; automatic rescan; adjacent workspace unchanged',
       'Fixture content and modification times unchanged', 'No observed page errors'],
     notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation']
   };

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- Native cache maintenance: npm verify/clean, pnpm store prune and pip cache purge, with an explicit preview and Run step.
+- Exact command, tool version, target path, effects and copy-command option; bounded live log, cancellation and honest success/failure results.
+- Fresh before/after logical-size measurement and automatic rescan of the original scope.
+- Host-side protection, complete-scan gating, exact cache identity, no links/junctions, path revalidation, isolated configuration and single-use expiring plans.
+- npm 8–11, pnpm 8–10 and pip 21–26 direct installations supported. Gradle/Maven build operations remain guidance only.
+
 ## 0.2.3
 
 - Large folder tiles show a clickable preview of their immediate contents, preserving measured totals and explicitly accounting for missing detail.

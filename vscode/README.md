@@ -2,7 +2,7 @@
 
 Understand the storage used by your developer projects and shared caches before removing anything.
 
-DevSpace is a **local, read-only analyzer** for Gradle/Maven, Node/npm and Python. It explains findings, protection rules, evidence and recovery limits. Sizes are logical file lengths, not guaranteed disk savings.
+DevSpace provides **local, read-only scans and explicit cache maintenance** for Gradle/Maven, Node/npm and Python. It explains findings, protection rules, evidence and recovery limits. Sizes are logical file lengths, not guaranteed disk savings.
 
 ## Install and open
 
@@ -11,9 +11,12 @@ DevSpace is a **local, read-only analyzer** for Gradle/Maven, Node/npm and Pytho
 3. Click the **DevSpace** icon in the Activity Bar, or run **DevSpace: Open Analyzer** in the Command Palette. You can also use **View → Open View… → DevSpace Analyzer**.
 4. Choose **Scan workspace** or **Choose folder to scan…**. You can right-click a local folder in Explorer and choose **DevSpace: Scan Folder…**.
 
-The Rust scanner is included in the VSIX. End users do not need Rust, Node, Java, Python or a separate DevSpace desktop installation.
+The Rust scanner is included in the VSIX. Scanning needs no Rust, Node, Java, Python or separate desktop installation. Optional cleanup uses an installed supported npm/pnpm CLI or Python with pip.
 
 ## What you get
+
+- Review and run native npm verify/clean, pnpm store prune or pip cache purge for a scanned cache. See the exact target and command before Run, live output, before/after measurements and an automatic rescan. Scans never start cleanup.
+- Complete, unprotected cache findings only. Targets and installed tools are revalidated, plans expire after five minutes, and only one operation runs at a time. npm 8–11, pnpm 8–10 and pip 21–26 are supported through direct installations on the host PATH; Corepack/wrapper launchers and other versions require manual guidance.
 
 - Overview, searchable Findings, folder-level Storage, Projects and Scan coverage in a reusable analysis tab.
 - Follow unclassified space into child folders and large file samples, with complete byte totals even when retained detail is limited.
@@ -35,7 +38,7 @@ Review suggestions use project recovery evidence first, then logical size, and e
 
 Pilot packages: Windows x64, Linux x64 (glibc), macOS x64 and macOS arm64. VS Code 1.85 or later. This release supports **local desktop windows**. Remote SSH, WSL, Dev Containers, virtual workspaces and vscode.dev scanning are outside this release. Open a local VS Code window to scan local folders.
 
-Restricted Mode permits the demo but blocks real scanning and folder access. No scan starts when the extension activates. The scanner executes no project code, shell command, build, package manager or Git command and makes no network requests. It retains the desktop scanner's conservative protection, link handling, coverage limits and byte accounting.
+Restricted Mode permits the demo but blocks real scanning, cache maintenance and folder access. No scan starts when the extension activates. The scanner executes no project code, shell command, build, package manager or Git command and makes no network requests. It retains the desktop scanner's conservative protection, link handling, coverage limits and byte accounting.
 
 ## Build and verify
 

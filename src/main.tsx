@@ -7,4 +7,5 @@ import './results.css';
 import './decisions.css';
 import './storage-charts.css';
 import './navigation.css';
+import './cleanup.css';
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

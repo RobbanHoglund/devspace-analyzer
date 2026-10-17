@@ -32,6 +32,11 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install native cleanup fixture tools
+        run: npm install --global pnpm@10.34.7
       - uses: Swatinem/rust-cache@v2
       - run: npm ci --no-audit --no-fund
       - run: npm ci --prefix vscode --no-audit --no-fund
