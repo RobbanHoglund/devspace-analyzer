@@ -14,7 +14,9 @@ fn node_cli(name: &str, filename: &str) -> Result<Tool, String> {
             .or_else(|| node.parent().map(|p| p.join("node_modules").join(name).join("bin").join(filename)).filter(|p| p.is_file()))
     } else { executable(name).filter(|p| p.file_name().is_some_and(|n| n == filename)) };
     let script = script.and_then(|p| fs::canonicalize(p).ok()).ok_or_else(|| format!("A direct {name} CLI installation was not found. Install {name} alongside Node.js; Corepack and shell wrappers are not executed."))?;
-    Tool::new(node, vec![script.to_string_lossy().into()], vec![script])
+    // Use ordinary drive paths at the CLI boundary; retain canonical
+    // namespaced paths separately for identity/revalidation checks.
+    Tool::new(node, vec![cli_path(&script)], vec![script])
 }
 impl Tool {
     fn new(executable: PathBuf, prefix: Vec<String>, mut files: Vec<PathBuf>) -> Result<Self, String> {
@@ -37,7 +39,10 @@ impl Tool {
     pub fn version(&self, cwd: &Path, cancelled: &AtomicBool) -> Result<String, String> {
         let mut args = self.prefix.clone(); args.push("--version".into());
         let result = self.execute(&args, cwd, cancelled, Duration::from_secs(20), &mut |_| {})?;
-        if result.status != "succeeded" { return Err("Could not read the installed tool version. Install a supported tool or copy its documented command.".into()); }
+        if result.status != "succeeded" {
+            let detail: String = result.log.chars().take(2000).collect();
+            return Err(format!("Could not read the installed tool version ({}; exit {:?}). Check the direct CLI installation. {}", result.status, result.code, detail.trim()));
+        }
         let version = result.log.trim().to_owned();
         if version.len() > 500 { return Err("Unexpected tool version response.".into()); } Ok(version)
     }
@@ -60,7 +65,7 @@ impl Tool {
         Ok(result.log)
     }
     pub fn execute(&self, args: &[String], cwd: &Path, cancelled: &AtomicBool, timeout: Duration, log: &mut impl FnMut(&str)) -> Result<process::Execution, String> {
-        process::run(&self.executable, args, cwd, cancelled, timeout, log)
+        process::run(Path::new(&cli_path(&self.executable)), args, cwd, cancelled, timeout, log)
     }
 }
 pub(super) fn resolve(action: Action, cache: &Path) -> Result<Tool, String> {
@@ -82,7 +87,7 @@ pub(super) fn supported(action: Action, version: &str) -> Result<(), String> {
     let supported = match action { Action::NpmVerify | Action::NpmClean => (8..=11).contains(&major), Action::PnpmPrune => (8..=10).contains(&major), Action::PipPurge => (21..=26).contains(&major) };
     if !supported { return Err("Unsupported tool version. This release supports npm 8–11, pnpm 8–10 and pip 21–26. Use the owning tool's guidance for other versions.".into()); } Ok(())
 }
-fn cli_path(path: &Path) -> String { let text = path.to_string_lossy(); text.strip_prefix(r"\\?\").unwrap_or(&text).into() }
+pub(super) fn cli_path(path: &Path) -> String { let text = path.to_string_lossy(); text.strip_prefix(r"\\?\").unwrap_or(&text).into() }
 pub(super) fn display_command(program: &str, args: &[String]) -> (String, String) {
     if cfg!(windows) {
         let quote = |s: &str| format!("'{}'", s.replace('\'', "''"));

@@ -113,7 +113,7 @@ pub fn prepare(request: Request, cancelled: &AtomicBool) -> Result<Prepared, Str
     };
     let (before_bytes, before_files) = measure(&target, cancelled)?;
     let arguments = command.arguments(request.action, &cache);
-    let executable = paths::display(&command.executable);
+    let executable = tools::cli_path(&command.executable);
     let (command_text, shell) = tools::display_command(&executable, &arguments);
     let mut effects = vec![match request.action {
         Action::NpmVerify => "Checks package integrity and removes unneeded or corrupt cache data. Verification changes the cache; it is not a dry run.",
