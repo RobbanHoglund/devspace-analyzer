@@ -36,7 +36,11 @@ for (const name of ['react', 'react-dom', 'scheduler', '@tauri-apps/api', '@taur
     notices.push(readFileSync(path.join(repoRoot, 'node_modules', '@tauri-apps', 'api', 'LICENSE-MIT'), 'utf8'));
   }
 }
-const metadataRun = spawnSync('cargo', ['metadata', '--locked', '--format-version', '1'], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+// Include licenses for the dependency graph actually compiled for this host.
+// Without this filter, optional UEFI/WASI dependencies enter desktop packages.
+const rustHost = spawnSync('rustc', ['-vV'], { encoding: 'utf8' }).stdout?.match(/^host: (.+)$/m)?.[1];
+if (!rustHost) throw new Error('Could not determine the scanner build platform.');
+const metadataRun = spawnSync('cargo', ['metadata', '--locked', '--format-version', '1', '--filter-platform', rustHost], { cwd: repoRoot, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
 if (metadataRun.status !== 0) throw new Error('Could not collect scanner dependency licenses.');
 const metadata = JSON.parse(metadataRun.stdout);
 const start = metadata.packages.find(pkg => pkg.name === 'devspace-core');
