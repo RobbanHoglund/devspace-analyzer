@@ -1,4 +1,4 @@
-name: Pilot checks
+name: Core and desktop checks
 on:
   push:
     branches: [main, feature/pilot, fix/pilot-review-001]
@@ -7,7 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pilot-${{ github.workflow }}-${{ github.ref }}
+  group: devspace-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   core-and-ui:
@@ -73,9 +73,9 @@ jobs:
         run: npm run tauri -- build --bundles nsis -- --locked
       - name: Prepare supported WebView2 runtime
         run: ./scripts/windows-test-runtime.ps1
-      - name: Exercise actual desktop through WebView2
+      - name: Install, exercise the desktop through WebView2, and uninstall
         timeout-minutes: 5
-        run: ./scripts/windows-native-test.ps1
+        run: ./scripts/windows-installer-test.ps1
       - name: Verify dependency locks remain unchanged
         run: git diff --exit-code -- package-lock.json Cargo.lock
       - name: Retain native evidence

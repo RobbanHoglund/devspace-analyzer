@@ -4,7 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { lstat } from 'node:fs/promises';
 import { Scanner } from './scanner';
-import { Cleanup, cleanupRequest } from './cleanup';
+import { documentationUrls } from '../../src/documentation';
 import { paths, record, scanRequest } from './protocol';
 import { exportContent, writeNewReport } from './export';
 import type { Report } from '../../src/types';
@@ -23,6 +23,14 @@ function unavailable(): string {
 }
 function requireLocal(): void { const reason = unavailable(); if (reason) throw new Error(reason); }
 function escapeAttribute(value: string): string { return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+
+async function validateRevealPath(target: string): Promise<void> {
+  let cursor = target;
+  for (;;) {
+    if ((await lstat(cursor)).isSymbolicLink()) throw new Error('This location now contains a link. Scan again before opening it.');
+    const parent = path.dirname(cursor); if (parent === cursor) return; cursor = parent;
+  }
+}
 
 class Navigation implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly change = new vscode.EventEmitter<void>();
@@ -56,7 +64,6 @@ export class Analyzer implements vscode.Disposable {
   private baseline: ScanSnapshot | null = null;
   private comparisonBaseline: ScanSnapshot | null = null;
   private readonly scanner: Scanner;
-  private readonly cleanup: Cleanup;
   private readonly navigation = new Navigation();
   private readonly tree: vscode.TreeView<vscode.TreeItem>;
   private activeTab: Tab = 'overview';
@@ -71,7 +78,6 @@ export class Analyzer implements vscode.Disposable {
     this.preferences = { roots: saved?.roots ?? roots, includeCaches: saved?.includeCaches ?? false, protectedPaths: context.globalState.get<string[]>('protectedPaths', []) };
     const binary = path.join(context.extensionPath, 'bin', process.platform === 'win32' ? 'devspace-scan.exe' : 'devspace-scan');
     this.scanner = new Scanner(binary, context.extensionPath);
-    this.cleanup = new Cleanup(binary, context.extensionPath, text => this.event('cleanup-log', text));
     this.tree = vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation });
     this.disposables.push(this.tree, this.tree.onDidChangeVisibility(() => this.syncView()));
     this.disposables.push(vscode.workspace.onDidGrantWorkspaceTrust(() => this.event('host-action', { availability: unavailable() })));
@@ -79,7 +85,7 @@ export class Analyzer implements vscode.Disposable {
     for (const [tab] of tabs) this.register(`devspace.${tab}`, () => this.action({ tab }));
     this.register('devspace.scanWorkspace', async () => {
       requireLocal();
-      if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
+      if (this.scanner.running) throw new Error('Finish the current scan first.');
       const roots = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath) ?? [];
       if (roots.length) this.action({ scanRoots: paths(roots, 32) });
       else await this.scanFolder();
@@ -102,7 +108,7 @@ export class Analyzer implements vscode.Disposable {
   }
   private async scanFolder(uri?: vscode.Uri): Promise<void> {
     requireLocal();
-    if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
+    if (this.scanner.running) throw new Error('Finish the current scan first.');
     if (uri && uri.scheme !== 'file') throw new Error('Choose a local folder.');
     const selected = uri ? paths([uri.fsPath], 32) : await this.folders();
     if (selected?.length) this.action({ scanRoots: selected });
@@ -118,6 +124,7 @@ export class Analyzer implements vscode.Disposable {
     const panel = vscode.window.createWebviewPanel('devspace.analyzer', 'DevSpace Analyzer', vscode.ViewColumn.Active, {
       enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media], enableCommandUris: false,
     });
+    panel.iconPath = { light: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'devspace-light.svg'), dark: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'devspace-dark.svg') };
     this.panel = panel; this.ready = false;
     const nonce = randomBytes(24).toString('base64');
     const script = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', 'index.js'));
@@ -136,7 +143,7 @@ export class Analyzer implements vscode.Disposable {
       finally { active.delete(id); }
     });
     panel.onDidDispose(() => {
-      messages.dispose(); if (this.panel === panel) { this.panel = undefined; this.ready = false; this.pending = undefined; this.scanner.dispose(); this.cleanup.dispose(); }
+      messages.dispose(); if (this.panel === panel) { this.panel = undefined; this.ready = false; this.pending = undefined; this.scanner.dispose(); }
     });
   }
   private event(name: string, payload: unknown): void { if (this.panel) void this.panel.webview.postMessage({ type: 'event', name, payload }); }
@@ -158,7 +165,6 @@ export class Analyzer implements vscode.Disposable {
       case 'save_preferences': {
         if (typeof args.includeCaches !== 'boolean') throw new Error('Invalid scan preferences.');
         const next = { roots: paths(args.roots, 32), protectedPaths: paths(args.protectedPaths, 20000), includeCaches: args.includeCaches };
-        if (this.cleanup.running && JSON.stringify(next.protectedPaths) !== JSON.stringify(this.preferences.protectedPaths)) throw new Error('Finish cleanup before changing protection.');
         this.preferences = next;
         const saved = this.preferences;
         // Serialize memento writes so a slow prior update cannot restore stale choices.
@@ -170,7 +176,7 @@ export class Analyzer implements vscode.Disposable {
       }
       case 'scan': {
         requireLocal(); const request = scanRequest(args.request);
-        if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
+        if (this.scanner.running) throw new Error('Finish the current scan first.');
         this.navigation.description = 'Scanning…'; this.navigation.refresh();
         void vscode.commands.executeCommand('setContext', 'devspace.scanning', true);
         try {
@@ -187,32 +193,20 @@ export class Analyzer implements vscode.Disposable {
         } catch (error) { this.navigation.description = this.report ? 'Scan failed · previous report retained' : 'Scan failed'; throw error; }
         finally { void vscode.commands.executeCommand('setContext', 'devspace.scanning', false); this.navigation.refresh(); }
       }
+      case 'open_documentation': {
+        if (typeof args.url !== 'string' || !documentationUrls.some(url => url === args.url)) throw new Error('Unsupported documentation URL.');
+        if (!await vscode.env.openExternal(vscode.Uri.parse(args.url))) throw new Error('Could not open the browser.');
+        return null;
+      }
       case 'copy_text': {
         if (typeof args.text !== 'string' || args.text.length > 8192) throw new Error('Invalid clipboard text.');
         await vscode.env.clipboard.writeText(args.text); return null;
       }
-      case 'prepare_cleanup': {
-        requireLocal();
-        if (this.scanner.running || this.cleanup.running) throw new Error('Finish the current scan or cleanup first.');
-        if (this.report?.findings.find(f => f.id === args.id)?.path !== args.expectedPath) throw new Error('This finding changed. Scan again before cleanup.');
-        return this.cleanup.prepare(cleanupRequest(this.report, args.id, args.action, this.preferences.protectedPaths));
-      }
-      case 'run_cleanup': {
-        requireLocal();
-        try { return await this.cleanup.run(args.id); }
-        finally { this.report = undefined; this.navigation.description = 'Scan again after cache maintenance'; this.navigation.refresh(); }
-      }
-      case 'cancel_cleanup': return this.cleanup.cancel();
       case 'reveal_storage': {
         requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
         const directory = this.report?.storage?.directories.find(d => d.id === args.id);
         if (!directory) throw new Error('Folder is not in the current scan.');
-        let cursor = directory.path;
-        for (;;) {
-          const stat = await lstat(cursor);
-          if (stat.isSymbolicLink()) throw new Error('This location now contains a link. Scan again before opening it.');
-          const parent = path.dirname(cursor); if (parent === cursor) break; cursor = parent;
-        }
+        await validateRevealPath(directory.path);
         await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(directory.path)); return null;
       }
       case 'cancel_scan': this.scanner.cancel(); return null;
@@ -220,8 +214,7 @@ export class Analyzer implements vscode.Disposable {
         requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
         const finding = this.report?.findings.find(f => f.id === args.id);
         if (!finding) throw new Error('Finding is not in the current scan.');
-        const stat = await lstat(finding.path);
-        if (stat.isSymbolicLink()) throw new Error('This location is now a link. Scan again before opening it.');
+        await validateRevealPath(finding.path);
         await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(finding.path)); return null;
       }
       case 'save_export': {
@@ -236,7 +229,7 @@ export class Analyzer implements vscode.Disposable {
   }
   /** Non-sensitive lifecycle status for consumers and integration checks. Reports stay in memory. */
   getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete, activeTab: this.activeTab, selectedTab: this.tree.selection[0]?.id }; }
-  dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.cleanup.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
+  dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
 }
 
 let analyzer: Analyzer | undefined;

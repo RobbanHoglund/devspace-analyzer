@@ -65,7 +65,7 @@ fn run() -> Result<(), String> {
 }
 
 fn main() {
-    let result = if std::env::args().skip(1).collect::<Vec<_>>() == ["--cleanup"] { devspace_core::cleanup::serve() } else if std::env::args().len() == 1 { run() } else { Err("Unsupported scanner arguments.".into()) };
+    let result = if std::env::args_os().len() == 1 { run() } else { Err("Unsupported scanner arguments.".into()) };
     if let Err(message) = result {
         let _ = emit(json!({"type":"error", "message":message}));
         std::process::exit(1);

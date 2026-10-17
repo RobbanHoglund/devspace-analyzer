@@ -66,14 +66,16 @@ test('rejects duplicate concurrent scans and cancels a running native scan', asy
   const fresh = await scanner.scan(request(root), () => {}); assert.equal(fresh.cancelled, false);
 });
 test('scanner rejects incompatible protocol and oversized input', async () => {
-  async function run(input) {
+  async function run(input, args = []) {
     return new Promise((resolve, reject) => {
-      const child = spawn(binary, [], { cwd: extensionRoot, windowsHide: true }); let output = '';
+      const child = spawn(binary, args, { cwd: extensionRoot, windowsHide: true }); let output = '';
       child.stdout.on('data', data => output += data); child.on('error', reject);
       child.stdin.on('error', () => {}); child.stdin.end(input);
       child.on('close', code => resolve({ code, output }));
     });
   }
+  const removedCleanup = await run('', ['--cleanup']);
+  assert.equal(removedCleanup.code, 1); assert.match(removedCleanup.output, /Unsupported scanner arguments/);
   const incompatible = await run(JSON.stringify({ protocolVersion: 2, request: request(extensionRoot) }) + '\n');
   assert.equal(incompatible.code, 1); assert.match(incompatible.output, /Unsupported scanner protocol/);
   const incomplete = await run(JSON.stringify({ protocolVersion: 1, request: {} }) + '\n');

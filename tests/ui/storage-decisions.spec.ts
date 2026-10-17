@@ -32,7 +32,13 @@ for (const width of [380, 1440]) test(`storage drill-down explains other files a
   await expect(storage.getByLabel('Other measured files only')).toBeChecked();
   await storage.locator('.storage-folder').filter({ hasText: 'Project' }).click();
   await expect(storage.locator('.storage-row')).toHaveCount(1);
-  await storage.locator('.storage-folder').filter({ hasText: 'logs' }).click();
+  const folder = storage.locator('.storage-folder').filter({ hasText: 'logs' });
+  await folder.scrollIntoViewIfNeeded();
+  const beforeHover = await folder.boundingBox();
+  await folder.hover();
+  const afterHover = await folder.boundingBox();
+  expect(Math.abs(afterHover!.y - beforeHover!.y)).toBeLessThanOrEqual(1);
+  await folder.click();
   await expect(storage).toContainText('application.log'); await expect(storage).toContainText('20 MiB');
   await expect(storage.locator('.storage-file').filter({ hasText: 'Other direct files' })).toContainText('2 MiB');
   await storage.getByRole('button', { name: 'Show in file manager', exact: true }).click();

@@ -2,18 +2,19 @@
 
 **Understand your development storage before removing anything.**
 
-Windows-first desktop pilot for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
+Local storage analyzer for VS Code and a Windows-first desktop preview for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Feature release 0.3.0 adds explicit npm, pnpm and pip cache maintenance. Scans remain read-only. Review the target and command, then choose Run; project build commands remain copy-only. Sizes are logical bytes, not guaranteed physical space savings.
+> Version 0.4.0 is fully read-only: identify space, review practical cleanup instructions, copy a command, then scan again after making changes yourself. DevSpace never runs cleanup or project commands. Sizes are logical bytes, not guaranteed physical space savings.
 
-## Feature release 0.3.0
+## Feature release 0.4.0
 
 Follow measured space into individual folders, see the evidence and prerequisites behind a project-specific review plan, and rescan the same scope to measure changes. A fresh scan captures the new folder breakdown and recovery evidence; older reports remain readable.
 
 ## Features
 
-- Cache maintenance from Overview or a cache finding: prepare a single-use preview, inspect the exact command and target, run explicitly, view bounded output, stop the command, and measure the same target again. The original scan scope refreshes automatically.
-- Supported actions: npm cache verify, npm cache clean --force, pnpm store prune and Python pip cache purge. Protected, incomplete, linked and stale targets are blocked. [Scope and supported tool installations](docs/CACHE_CLEANUP.md).
+- **How to clean up** appears in Overview and supported cache findings. It explains the measured folder, exact cache argument, command, consequences and recovery costs, with official documentation and an explicit **Scan again** action.
+- Copy-only guidance for npm verification/clear, pnpm store prune and pip cache purge. Protected or incompletely measured locations have explanations without cleanup commands. Missing caches link to Scan settings. [Guidance and boundaries](docs/CACHE_CLEANUP.md).
+- Shared author portrait and product icon conventions with JvmScope; local image assets and theme-aware VS Code navigation/editor icons.
 
 - Back/Forward history restores the view, folder, filters and scroll position. Sticky folder breadcrumbs, parent-folder shortcuts and Up navigation also cover small-item groups; Alt+Left/Right/Up work outside text fields.
 - Clickable distribution donut shows the share of measured space by ecosystem, including unclassified files. Select a segment to inspect its findings or folders.
@@ -60,7 +61,7 @@ Run `npm ci` and `npm run dev`, open `http://127.0.0.1:1420`, then select **Expl
 | Owned project size | File lengths charged exclusively to that project, excluding nested source projects |
 | Measured files | Files in the effective traversal roots, including unclassified data |
 
-Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this pilot. Their Inspect view includes the existing enclosing protected finding with an explanation, without adding findings or reassigning bytes.
+Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this preview. Their Inspect view includes the existing enclosing protected finding with an explanation, without adding findings or reassigning bytes.
 
 ## Safety and scope
 
@@ -72,7 +73,7 @@ Only known bounded manifest/configuration fields are read. No arbitrary source c
 
 Folder detail is bounded to 10,000 directories plus any remaining scan roots, an approximate 4 MiB detail budget and five file samples per retained directory. Bytes outside retained detail still count in the measured totals. Comparison retains at most 5,000 finding paths within a 1.5-million-character snapshot; omitted path detail is disclosed. A change in logical size does not prove what caused it or how much physical storage was freed.
 
-The pilot does not resolve complete dependency graphs, all Git branches, dirty/tracked state, remote availability, every running tool, physical allocation or complete container inventories. Project/CLI overrides, pip.ini and arbitrary Yarn/Gradle configuration are not evaluated. The scan is bounded to 5 million entries, 20,000 findings, 10,000 projects and 128 levels; at most 500 warning details are retained.
+The scanner does not resolve complete dependency graphs, all Git branches, dirty/tracked state, remote availability, every running tool, physical allocation or complete container inventories. Project/CLI overrides, pip.ini and arbitrary Yarn/Gradle configuration are not evaluated. The scan is bounded to 5 million entries, 20,000 findings, 10,000 projects and 128 levels; at most 500 warning details are retained.
 
 See [Safety and privacy](docs/SAFETY.md), [native verification](docs/NATIVE_TESTING.md) and [next steps](docs/NEXT_STEPS.md). Snapshot path guards are not race-free protection against hostile concurrent filesystem changes. No formal security audit is claimed.
 
@@ -86,7 +87,7 @@ npx playwright install chromium
 npm run test:ui
 ```
 
-Normal CI runs original and review regression tests on Linux/Windows, frontend tests/build, browser interaction tests, Windows packaging and a real native scan. `scripts/windows-native-test.ps1` exercises the release executable at normal user integrity. Large-workspace benchmarks/cancellation, native file-dialog interaction and installer installation/uninstallation remain separate validation tasks.
+Normal CI runs original and review regression tests on Linux/Windows, frontend tests/build, browser interaction tests, Windows packaging and a real native scan. `scripts/windows-native-test.ps1` exercises the release executable at normal user integrity. CI also records a synthetic 100,100-file scanner benchmark, tests the declared minimum VS Code version, and installs, exercises and uninstalls the Windows desktop. Native file-dialog interaction and acceptance on real workspaces remain separate validation tasks.
 
 Dependency snapshots in `package-lock.json` and `Cargo.lock` come from the verified main CI run [38050353533](https://github.com/RobbanHoglund/devspace-analyzer/actions/runs/38050353533). Use `npm ci` and Cargo `--locked`; CI enforces both, including native packaging. Lockfiles pin dependency resolution, not compiler versions, installer signatures or byte-identical binaries. Update them explicitly and verify on Linux and Windows.
 
@@ -103,4 +104,8 @@ No server, account or database is needed for scanning. The development toolchain
 
 ## VS Code extension
 
-An installable VS Code pilot lives in [`vscode/`](vscode/README.md). It reuses the Rust scanner and analysis UI, adds an Activity Bar view and workspace/folder commands, and includes its own scanner binary. Download the matching `devspace-vscode-*` artifact from a successful **VS Code extension** workflow, extract the VSIX, then use **Extensions → … → Install from VSIX…**. Local trusted desktop windows are supported; shared cache scanning is opt-in. See the extension README for installation, platform limits and development checks.
+An installable VS Code extension lives in [`vscode/`](vscode/README.md). It reuses the Rust scanner and analysis UI, adds an Activity Bar view and workspace/folder commands, and includes its own scanner binary. Download the matching `devspace-vscode-*` artifact from a successful **VS Code extension** workflow, extract the VSIX, then use **Extensions → … → Install from VSIX…**. Local trusted desktop windows are supported; shared cache scanning is opt-in. See the extension README for installation, platform limits and development checks.
+
+## Release readiness
+
+Version 0.4.0 is a preview, not a GA declaration. See [the GA review](docs/GA_REVIEW.md) for verified coverage and the remaining publication, license and desktop-distribution decisions. The current evaluation license has not been changed.

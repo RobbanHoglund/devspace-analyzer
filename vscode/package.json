@@ -1,8 +1,8 @@
 {
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
-  "description": "Local developer storage analysis with explicit npm, pnpm and pip cache maintenance.",
-  "version": "0.3.0",
+  "description": "Read-only developer storage analysis with interactive maps and practical cleanup guidance.",
+  "version": "0.4.0",
   "publisher": "RobbanHoglund",
   "license": "UNLICENSED",
   "repository": {
@@ -13,6 +13,7 @@
     "vscode": "^1.85.0"
   },
   "categories": [
+    "Visualization",
     "Other"
   ],
   "keywords": [
@@ -152,5 +153,11 @@
     "@vscode/test-electron": "3.1.0",
     "@vscode/vsce": "4.0.0",
     "typescript": "5.9.3"
+  },
+  "icon": "resources/robbanhoglund.png",
+  "preview": true,
+  "homepage": "https://github.com/RobbanHoglund/devspace-analyzer#readme",
+  "bugs": {
+    "url": "https://github.com/RobbanHoglund/devspace-analyzer/issues"
   }
 }

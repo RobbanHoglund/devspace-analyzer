@@ -14,3 +14,5 @@ vscode/bin/
 vscode/.vscode-test/
 vscode/THIRD_PARTY_NOTICES.txt
 *.vsix
+
+src-tauri/THIRD_PARTY_NOTICES.txt

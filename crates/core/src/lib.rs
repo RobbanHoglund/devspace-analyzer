@@ -1,5 +1,4 @@
 pub mod config;
-pub mod cleanup;
 pub mod model;
 mod npmrc;
 mod paths;

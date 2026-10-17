@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.0
+
+- Replace native cache execution with **How to clean up**: copy-only npm/pnpm/pip instructions, exact cache paths, effects, official documentation and explicit same-scope rescan comparison.
+- Remove all cleanup execution handlers, subprocess adapters and the scanner's `--cleanup` mode. Obsolete compiled host modules are removed before packaging.
+- Keep guidance discoverable with an empty state that opens Scan settings. Explain protected/partial cache restrictions, and allow guidance for complete caches when unrelated scan coverage is partial.
+- Reuse the original JvmScope author portrait in package/native icons and the app header; align product and navigation icon conventions.
+- Open only allowlisted documentation pages through the host, keep the guidance dialog header/footer accessible, and verify assets in the installed VSIX.
+- Update test dependencies to patched Vitest 4.1.11. The npm dependency audits are clean as of this review; build/test tools are not bundled into the extension runtime.
+- Keep this release labelled Preview while GA publication and license decisions are outstanding.
+
+
 ## 0.3.0
 
 - Native cache maintenance: npm verify/clean, pnpm store prune and pip cache purge, with an explicit preview and Run step.

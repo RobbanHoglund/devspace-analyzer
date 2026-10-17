@@ -1,20 +1,17 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 mod export;
-mod cleanup;
 use std::{path::Path, sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}}};
 use devspace_core::model::{Report, ScanRequest};
-use tauri::{Emitter, Manager, State};
+use tauri::{Emitter, State};
 
 #[derive(Default)]
 struct AppState {
     running: Arc<AtomicBool>, cancelled: Arc<AtomicBool>, report: Mutex<Option<Report>>,
-    protected_paths: Mutex<Vec<String>>, cleanup: Mutex<Option<devspace_core::cleanup::Prepared>>,
 }
 #[tauri::command]
 async fn scan(request: ScanRequest, app: tauri::AppHandle, state: State<'_, AppState>) -> Result<Report, String> {
     if state.running.swap(true, Ordering::SeqCst) { return Err("A scan is already running.".into()); }
     state.cancelled.store(false, Ordering::SeqCst);
-    *state.protected_paths.lock().map_err(|_| "Protection state unavailable")? = request.protected_paths.clone();
     let cancelled = state.cancelled.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
         devspace_core::scan(request, &cancelled, |progress| { let _ = app.emit("scan-progress", progress); })
@@ -64,29 +61,32 @@ fn open_directory(directory: &Path) -> Result<(), String> {
     result.map(|_| ()).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn open_documentation(url: String) -> Result<(), String> {
+    const ALLOWED: &[&str] = &[
+        "https://docs.npmjs.com/cli/v11/commands/npm-cache/", "https://docs.npmjs.com/cli/v11/commands/npm-ci/",
+        "https://pnpm.io/cli/store", "https://pip.pypa.io/en/stable/cli/pip_cache/", "https://docs.python.org/3/library/venv.html",
+        "https://docs.gradle.org/current/userguide/building_java_projects.html", "https://docs.gradle.org/current/userguide/directory_layout.html",
+        "https://maven.apache.org/plugins/maven-clean-plugin/",
+    ];
+    if !ALLOWED.contains(&url.as_str()) { return Err("Unsupported documentation URL.".into()); }
+    #[cfg(windows)]
+    let result = {
+        let system = std::env::var_os("SystemRoot").ok_or("SystemRoot is unavailable")?;
+        std::process::Command::new(Path::new(&system).join("explorer.exe")).arg(&url).spawn()
+    };
+    #[cfg(target_os = "macos")]
+    let result = std::process::Command::new("/usr/bin/open").arg(&url).spawn();
+    #[cfg(all(not(windows), not(target_os = "macos")))]
+    let result = std::process::Command::new("xdg-open").arg(&url).spawn();
+    result.map(|_| ()).map_err(|e| e.to_string())
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .manage(AppState::default())
-        .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let state = window.state::<AppState>();
-                if state.running.load(Ordering::SeqCst) {
-                    state.cancelled.store(true, Ordering::SeqCst);
-                    if state.cleanup.lock().is_ok_and(|mut plan| plan.take().is_some()) { state.running.store(false, Ordering::SeqCst); }
-                    else {
-                        // Keep the host alive until its native child has stopped and been reaped.
-                        api.prevent_close();
-                        let running = state.running.clone(); let window = window.clone();
-                        std::thread::spawn(move || {
-                            while running.load(Ordering::SeqCst) { std::thread::sleep(std::time::Duration::from_millis(100)); }
-                            let _ = window.close();
-                        });
-                    }
-                }
-            }
-        })
-        .invoke_handler(tauri::generate_handler![scan, cancel_scan, reveal_finding, reveal_storage, export::save_export, cleanup::save_preferences, cleanup::prepare_cleanup, cleanup::run_cleanup, cleanup::cancel_cleanup])
+        .invoke_handler(tauri::generate_handler![scan, cancel_scan, reveal_finding, reveal_storage, open_documentation, export::save_export])
         .run(tauri::generate_context!())
         .expect("Unable to start DevSpace Analyzer");
 }

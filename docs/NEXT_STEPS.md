@@ -27,5 +27,7 @@ The most important review areas are scope coverage, false confidence in cleanup 
 3. Add a strictly opt-in, bounded Git-status adapter before making tracked-file or uncommitted-change claims. Keep worktrees and branch scope explicit.
 4. Add better dependency-origin checks for local/file/editable packages, lockfile validation and recovery evidence. No absence-of-reference proof based only on the scanned projects.
 5. Measure allocated size separately where the operating system supports it, and identify shared hardlinks without presenting false reclaim guarantees.
-6. Add snapshot comparison, custom output directories and performance benchmarks with representative Java/Node/Python workspaces.
-7. Extend the separately reviewed cache adapters and installed-version coverage with disposable native-tool fixtures. Version 0.3.0 uses command previews, not fictitious dry-run deletion lists. Gradle/Maven execution and broad recursive deletion remain outside the supported actions.
+6. Extend the existing snapshot comparison and synthetic performance baseline with representative Windows Java/Node/Python workspaces and custom output directories.
+7. Maintain the copy-only cleanup guidance against official tool documentation. Runtime tool execution was removed in 0.4.0.
+
+See [GA review](GA_REVIEW.md) for the current release gates and measured validation.

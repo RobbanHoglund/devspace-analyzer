@@ -147,24 +147,22 @@ try {
   await page.getByLabel('Add folder path').fill(npmCache);
   await page.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
-  const maintenance = page.getByRole('region', { name: 'Cache maintenance' });
+  const maintenance = page.getByRole('region', { name: 'Cache cleanup guidance' });
   await expect(maintenance).toBeVisible();
-  await maintenance.getByRole('button', { name: 'Review cleanup →' }).click();
-  const cleanup = page.getByRole('dialog', { name: 'Review before running' });
-  await cleanup.getByRole('radio', { name: /Clear npm package cache/ }).check();
-  await cleanup.getByRole('button', { name: 'Prepare preview' }).click();
-  await expect(cleanup.getByRole('button', { name: 'Run cleanup', exact: true })).toBeVisible();
+  await maintenance.getByRole('button', { name: 'How to clean up →' }).click();
+  const guide = page.getByRole('dialog', { name: 'How to clean up' });
+  await guide.getByRole('radio', { name: 'Clear npm package cache', exact: true }).check();
+  await expect(guide.getByLabel('Cleanup command', { exact: true })).toContainText('cache clean --force');
+  await expect(guide.getByRole('button', { name: /^Run / })).toHaveCount(0);
   expect(readFileSync(join(npmCache, '_cacache', 'fixture')).length).toBe(2048);
-  await page.screenshot({ path: join(artifacts, 'native-cleanup-preview.png') });
-  await cleanup.getByRole('button', { name: 'Run cleanup', exact: true }).click();
-  const cleanupResult = page.getByRole('dialog', { name: 'Maintenance result' });
-  await expect(cleanupResult.getByRole('heading', { name: 'Command completed', exact: true })).toBeVisible();
-  await expect(cleanupResult.getByRole('button', { name: 'Done', exact: true })).toBeEnabled();
-  await expect(cleanupResult.getByRole('region', { name: 'Cleanup result' })).toContainText('0 B');
-  expect(existsSync(join(npmCache, '_cacache', 'fixture'))).toBe(false);
+  expect(await page.locator('.product-identity img').evaluate(el => el.complete && el.naturalWidth > 0)).toBe(true);
+  await page.screenshot({ path: join(artifacts, 'native-cleanup-guidance.png') });
+  // Simulate a manual change outside the application, only in our fixture.
+  rmSync(join(npmCache, '_cacache', 'fixture'));
+  await guide.getByRole('button', { name: 'Scan again', exact: true }).click();
+  await expect(comparison).toContainText('2 KiB less measured', { timeout: 30000 });
   expect(snapshot(workspace)).toEqual(changed);
-  await page.screenshot({ path: join(artifacts, 'native-cleanup-result.png') });
-  await cleanupResult.getByRole('button', { name: 'Done', exact: true }).click();
+  await page.screenshot({ path: join(artifacts, 'native-guidance-comparison.png') });
   expect(errors).toEqual([]);
   const result = {
     passed: true, revision: process.env.GITHUB_SHA ?? 'local',
@@ -177,7 +175,7 @@ try {
       'Intrinsic protection cannot be removed by personal-protection toggle',
       'Native storage drill-down and file sample', 'Detected wrapper yields a copy-only review command',
       'Second real scan measures the exact test-only 1 KiB change',
-      'Explicit npm cleanup preview and run; 2 KiB to zero; automatic rescan; adjacent workspace unchanged',
+      'Copy-only npm guidance; explicit rescan measures test-only 2 KiB change; adjacent workspace unchanged',
       'Fixture content and modification times unchanged', 'No observed page errors'],
     notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation']
   };

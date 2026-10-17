@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DocumentationLink } from './DocumentationLink';
 import { reviewPlan } from './reviewPlan';
 import { visiblePath } from './analysis';
 import { inVSCode, invoke } from './host';
@@ -20,6 +21,6 @@ export function ReviewPlan({ finding, projects, protectedPaths, demo }: { findin
     <div className="plan-step"><h4>How to recover</h4><p>{plan.recovery}</p></div>
     <div className="plan-step"><h4>What it costs</h4><p>{plan.tradeoff}</p></div>
     {plan.command && <details className="plan-command"><summary>{demo ? 'Example command · demo only' : plan.command.label}</summary><p>{plan.command.note}</p><span className="tiny muted">Working directory</span><p className="mono">{visiblePath(plan.directory ?? '')}</p><pre><code>{plan.command.text}</code></pre><button onClick={copy}>{demo ? 'Copy example command' : 'Copy command'}</button><p role="status">{copyState}</p></details>}
-    {plan.documentation && <a href={plan.documentation} target="_blank" rel="noreferrer">Tool documentation ↗</a>}
+    {plan.documentation && <DocumentationLink href={plan.documentation}>Tool documentation ↗</DocumentationLink>}
   </section>;
 }

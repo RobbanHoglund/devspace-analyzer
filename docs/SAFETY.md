@@ -1,8 +1,8 @@
 # Safety and privacy
 
-## Read-only scans; separate opt-in maintenance
+## Read-only analysis and manual guidance
 
-The scanner uses directory enumeration, metadata and a bounded set of configuration reads. It does not remove, rename, overwrite, compress or move scanned files. Scanning has no shell, arbitrary filesystem or HTTP plugin. Version 0.3.0 adds separate allowlisted cache-maintenance endpoints, detailed in [Cache cleanup](CACHE_CLEANUP.md). Preparing and running maintenance are explicit user actions, independent of scanning.
+The scanner uses directory enumeration, metadata and a bounded set of configuration reads. It does not remove, rename, overwrite, compress or move scanned files. Scanning has no shell, arbitrary filesystem or HTTP plugin. Version 0.4.0 removes the native cache-maintenance endpoints. [Cleanup guidance](CACHE_CLEANUP.md) is copy-only: users review and execute commands in their own terminal, outside DevSpace.
 
 The desktop shell stores its own local preferences. Scanner validation of personal protection accepts existing local directories. Files, missing paths, links and other rejected inputs produce `invalid-protection` coverage warnings without dropping valid protection entries or blocking the scan. The UI retains saved preferences conservatively; these warnings do not remove preferences or override intrinsic protection. **Open folder** starts the operating system file manager for a finding or retained directory in the latest native scan. Folder IDs are resolved against that scan; arbitrary paths are not accepted by the reveal endpoint. **Export** opens a native save dialog and creates a new `.json` or `.md` file; existing files are never overwritten. An interrupted export may leave an incomplete newly created report. These explicit actions are separate from scanning.
 
@@ -36,7 +36,7 @@ Overlapping selected roots and shared-cache locations are collapsed to an effect
 
 The scanner does not follow symbolic links, Windows junctions or reparse points. A selected root containing a linked ancestor is rejected. Some cloud-placeholder files are therefore skipped. Sensitive directories such as `.ssh` and `.gnupg`, and major Windows system directories at the drive root, are excluded by default.
 
-Checks are snapshot-based path checks, not a race-free sandbox. A concurrently changed directory can invalidate a previous check. Do not scan actively hostile trees. This pilot does not use handle-relative traversal with operating-system no-follow guarantees. Scanning performs no writes or code execution. Native maintenance revalidates the target before invoking the owning tool, but is not a sandbox against hostile concurrent changes. Stop other package-manager jobs before running it.
+Checks are snapshot-based path checks, not a race-free sandbox. A concurrently changed directory can invalidate a previous check. Do not scan actively hostile trees. This pilot does not use handle-relative traversal with operating-system no-follow guarantees. Scanning performs no writes or code execution.
 
 Read errors, skipped entries, depth limits, entry limits and cancellation reduce coverage. The UI exposes this; findings with incomplete subtree measurements are excluded from the review-candidate total. Other complete findings can still be shown in a globally partial report.
 
@@ -70,6 +70,6 @@ Full JSON reports include the bounded folder inventory and recovery evidence. Fo
 
 ## Native security surface
 
-The application loads bundled local content. Its content-security policy rejects external scripts, frames and objects. The only enabled plugin capability is the directory picker plus Tauri's core window/event facilities. Custom native commands expose scan, cancellation, current-report folder reveal, user-dialog-mediated report export and prepare/run/cancel for the four supported cache actions. The frontend supplies a finding ID and allowlisted action, never a shell command. The host resolves the current native report and keeps the prepared plan; execution accepts only its single-use ID. VS Code requires a trusted local workspace.
+The application loads bundled local content. Its content-security policy rejects external scripts, frames and objects. The only enabled plugin capability is the directory picker plus Tauri's core window/event facilities. Custom native commands expose scanning, cancellation, current-report folder reveal, user-dialog-mediated report export and opening a fixed allowlist of official documentation URLs in the system browser. VS Code additionally provides clipboard copying and local preferences. There is no generic execution endpoint, cleanup endpoint or package-manager subprocess. VS Code filesystem actions require a trusted local workspace.
 
 The pilot has not undergone a formal security audit. Signed release binaries, large-scale performance measurements, stronger hostile-filesystem hardening and additional native UI tests are release-hardening work, not claims of this version.

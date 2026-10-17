@@ -32,16 +32,14 @@ jobs:
         with:
           node-version: '22'
       - uses: dtolnay/rust-toolchain@stable
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Install native cleanup fixture tools
-        run: npm install --global pnpm@10.34.7
       - uses: Swatinem/rust-cache@v2
       - run: npm ci --no-audit --no-fund
       - run: npm ci --prefix vscode --no-audit --no-fund
       - name: Build platform VSIX with bundled scanner
         run: npm run package --prefix vscode
+      - name: Synthetic 100,100-file scanner benchmark
+        if: runner.os != 'macOS'
+        run: node scripts/benchmark-scanner.mjs > artifacts/scanner-benchmark-${{ matrix.target }}.json
       - name: Protocol, cancellation, read-only scan and export regression tests
         run: npm test --prefix vscode
       - name: Install VSIX and exercise real VS Code
@@ -53,6 +51,11 @@ jobs:
       - name: Restricted Mode refuses scans and permits demo
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration --prefix vscode -- --restricted
+      - name: Verify the declared minimum VS Code version
+        if: runner.os == 'Linux'
+        env:
+          DEVSPACE_VSCODE_VERSION: '1.85.0'
+        run: xvfb-run -a npm run test:integration --prefix vscode
       - name: Verify locked dependencies
         run: git diff --exit-code -- package-lock.json Cargo.lock vscode/package-lock.json
       - name: Retain test evidence
@@ -61,8 +64,8 @@ jobs:
         with:
           name: vscode-checks-${{ matrix.target }}
           path: |
-            artifacts/*.png
-            artifacts/*.json
+            artifacts/**/*.png
+            artifacts/**/*.json
           retention-days: 14
       - name: Retain verified installable extension
         uses: actions/upload-artifact@v4

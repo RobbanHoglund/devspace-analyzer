@@ -9,6 +9,8 @@ const vsce = path.join(extensionRoot, 'node_modules', '@vscode', 'vsce', 'vsce')
 const listing = spawnSync(process.execPath, [vsce, 'ls', '--no-dependencies'], { cwd: extensionRoot, encoding: 'utf8' });
 if (listing.status !== 0) throw new Error(`Could not inspect VSIX contents: ${listing.stderr}`);
 const included = new Set(listing.stdout.trim().split(/\r?\n/).map(file => file.replaceAll('\\', '/')));
+if (!included.has(pkg.icon)) throw new Error('VSIX omits its publisher icon.');
+if ([...included].some(file => /(?:^|\/)cleanup\.js$/.test(file))) throw new Error('Obsolete cleanup runner remains in the package.');
 if (!included.has(pkg.main.replace(/^\.\//, ''))) throw new Error('VSIX omits its extension entry point.');
 for (const file of included) {
   if (!file.startsWith('dist/') || !file.endsWith('.js')) continue;

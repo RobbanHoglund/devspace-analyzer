@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as assert from 'node:assert/strict';
-import { readFile, stat, writeFile, mkdir } from 'node:fs/promises';
+import { readFile, stat, writeFile, mkdir, unlink } from 'node:fs/promises';
 import * as path from 'node:path';
 import { chromium, type Frame } from 'playwright';
 
@@ -99,32 +99,33 @@ export async function run(): Promise<void> {
       await waitFor(() => view.locator(`body.${css}`).count().then(n => n === 1), `Theme ${name} not applied`);
       await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-${css}.png`) });
     }
-    // Exercise the new action through the installed webview and bundled worker.
+    // Instructions and copy never execute cleanup. A test-only edit simulates
+    // the user doing maintenance outside DevSpace, then explicitly rescanning.
     const npmCache = path.join(temporary, 'npm-cache');
     await vscode.commands.executeCommand('devspace.scanFolder', vscode.Uri.file(npmCache));
-    const maintenance = view.getByRole('region', { name: 'Cache maintenance' }); await maintenance.waitFor();
-    await maintenance.getByRole('button', { name: 'Review cleanup →' }).click();
-    const preview = view.getByRole('dialog', { name: 'Review before running' });
-    await preview.getByRole('radio', { name: /Clear npm package cache/ }).check();
-    await preview.getByRole('button', { name: 'Prepare preview' }).click();
-    await preview.getByRole('button', { name: 'Run cleanup', exact: true }).waitFor();
-    assert.equal((await readFile(path.join(npmCache, '_cacache', 'fixture'))).length, 2048, 'Preview must not clean');
+    const maintenance = view.getByRole('region', { name: 'Cache cleanup guidance' }); await maintenance.waitFor();
+    await maintenance.getByRole('button', { name: 'How to clean up →' }).click();
+    const guide = view.getByRole('dialog', { name: 'How to clean up' });
+    await guide.getByRole('radio', { name: 'Clear npm package cache', exact: true }).check();
+    await guide.getByRole('button', { name: 'Copy command', exact: true }).click();
+    const copied = await vscode.env.clipboard.readText();
+    assert.ok(copied.includes('cache clean --force'));
+    assert.ok(copied.includes('npm-cache'));
+    assert.equal((await readFile(path.join(npmCache, '_cacache', 'fixture'))).length, 2048, 'Viewing and copying must not clean');
+    assert.equal(await guide.getByRole('button', { name: /^Run / }).count(), 0);
+    assert.ok(await view.locator('.product-identity img').evaluate((el: any) => el.complete && el.naturalWidth > 0), 'Shared author icon must load in the installed webview');
     for (const [name, css] of themes) {
       await vscode.workspace.getConfiguration('workbench').update('colorTheme', name, vscode.ConfigurationTarget.Global);
-      await waitFor(() => view.locator(`body.${css}`).count().then(n => n === 1), `Cleanup theme ${name} not applied`);
-      await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-cleanup-${css}.png`) });
+      await waitFor(() => view.locator(`body.${css}`).count().then(n => n === 1), `Guidance theme ${name} not applied`);
+      await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-guidance-${css}.png`) });
     }
-    await preview.getByRole('button', { name: 'Run cleanup', exact: true }).click();
-    const result = view.getByRole('dialog', { name: 'Maintenance result' });
-    await result.getByRole('heading', { name: 'Command completed', exact: true }).waitFor();
-    await waitFor(() => result.getByRole('button', { name: 'Done', exact: true }).isEnabled(), 'Cleanup did not refresh its scan');
-    assert.ok((await result.getByRole('region', { name: 'Cleanup result' }).innerText()).includes('0 B'));
-    await assert.rejects(readFile(path.join(npmCache, '_cacache', 'fixture')), { code: 'ENOENT' });
-    assert.deepEqual(await readFile(fixtureFile), changed.bytes, 'Cleanup must not touch the adjacent workspace');
-    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-cleanup-result.png`) });
-    await result.getByRole('button', { name: 'Done', exact: true }).click();
+    await unlink(path.join(npmCache, '_cacache', 'fixture'));
+    await guide.getByRole('button', { name: 'Scan again', exact: true }).click();
+    await comparison.getByText('2 KiB less measured', { exact: true }).waitFor();
+    assert.deepEqual(await readFile(fixtureFile), changed.bytes, 'Guidance and rescan must not touch the adjacent workspace');
+    await view.page().screenshot({ path: path.join(artifacts, `${process.platform}-guidance-comparison.png`) });
     await vscode.commands.executeCommand('devspace.scanWorkspace');
-    await waitFor(() => api.getStatus().complete && api.getStatus().projects === 1, 'Workspace scan after cleanup failed');
+    await waitFor(() => api.getStatus().complete && api.getStatus().projects === 1, 'Workspace scan after guidance failed');
     await vscode.commands.executeCommand('devspace.projects');
     await view.getByRole('heading', { name: /^Projects/ }).first().waitFor();
     await vscode.commands.executeCommand('devspace.coverage');
@@ -133,6 +134,6 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.open');
     await waitFor(() => api.getStatus().ready, 'Reopened view did not restore');
     assert.ok(api.getStatus().findings >= 1);
-    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, nativeCleanup: true, cleanupBeforeBytes: 2048, cleanupAfterBytes: 0, storageDrilldown: true, navigationHistory: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
+    await writeFile(path.join(artifacts, `vscode-integration-${process.platform}.json`), JSON.stringify({ installedPathVerified: true, realScan: true, readOnlyFixture: true, manualGuidance: true, copyDoesNotClean: true, sharedBrandIcon: true, manualFixtureDeltaBytes: 2048, storageDrilldown: true, navigationHistory: true, projectEvidence: true, realRescanDelta: 1024, themes: themes.map(t => t[0]), reopen: true, vscode: vscode.version }, null, 2));
   } finally { await browser.close(); }
 }
