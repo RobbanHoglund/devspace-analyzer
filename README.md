@@ -4,9 +4,11 @@
 
 Local storage analyzer for VS Code and a Windows-first desktop preview for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Version 0.4.0 is fully read-only: identify space, review practical cleanup instructions, copy a command, then scan again after making changes yourself. DevSpace never runs cleanup or project commands. Sizes are logical bytes, not guaranteed physical space savings.
+> Version 0.4.1 is fully read-only: identify space, review practical cleanup instructions, copy a command, then scan again after making changes yourself. DevSpace never runs cleanup or project commands. Sizes are logical bytes, not guaranteed physical space savings.
 
-## Feature release 0.4.0
+## Layout and performance update 0.4.1
+
+Overview is compact by default, with expandable recommendation reasons and the distribution closer to the summary. Windows scanning reuses directory-entry metadata and skips redundant probes for absent markers. [Changes, measurement method and limits](docs/PERFORMANCE.md).
 
 Follow measured space into individual folders, see the evidence and prerequisites behind a project-specific review plan, and rescan the same scope to measure changes. A fresh scan captures the new folder breakdown and recovery evidence; older reports remain readable.
 
@@ -108,4 +110,4 @@ An installable VS Code extension lives in [`vscode/`](vscode/README.md). It reus
 
 ## Release readiness
 
-Version 0.4.0 is a preview, not a GA declaration. See [the GA review](docs/GA_REVIEW.md) for verified coverage and the remaining publication, license and desktop-distribution decisions. The current evaluation license has not been changed.
+Version 0.4.1 is a preview, not a GA declaration. See [the GA review](docs/GA_REVIEW.md) for verified coverage and the remaining publication, license and desktop-distribution decisions. The current evaluation license has not been changed.

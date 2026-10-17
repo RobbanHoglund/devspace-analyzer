@@ -19,7 +19,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             Some(rule)
         });
         if protection.is_some() {
-            self.visit(root, None, 0, protection);
+            self.visit(root, None, 0, protection, None);
             return;
         }
         let (context, storage) = self.root_context(root);
@@ -33,7 +33,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             self.report.projects.push(p);
             Some(index)
         });
-        self.visit(root, owner, 0, storage);
+        self.visit(root, owner, 0, storage, None);
     }
 
     fn root_context(&mut self, root: &Path) -> (Option<Project>, Option<Rule>) {

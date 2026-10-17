@@ -90,7 +90,10 @@ fn includes(text: &str) -> (BTreeSet<PathBuf>, bool) {
 
 impl<F: FnMut(Progress)> Scanner<'_, F> {
     pub(super) fn project_at(&mut self, path: &Path, index: usize) -> Option<Project> {
-        let mut p = project(path, index).or_else(|| {
+        self.project_at_with_names(path, index, None)
+    }
+    pub(super) fn project_at_with_names(&mut self, path: &Path, index: usize, names: Option<&BTreeSet<std::ffi::OsString>>) -> Option<Project> {
+        let mut p = project_with_names(path, index, names).or_else(|| {
             let settings = self.gradle_modules.get(&key(path))?;
             Some(Project {
                 id: format!("p{index}"), name: path.file_name()?.to_string_lossy().into(), path: display(path),

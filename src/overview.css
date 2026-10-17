@@ -1,0 +1,95 @@
+/* Compact by default: keep the distribution and decisions together. Supporting
+   explanations expand in normal document flow; data and text are never clipped. */
+.devspace-vscode .report-present main{max-width:none;padding:14px 18px}
+.report-present .topbar{margin-bottom:6px}
+.report-present .report-context{display:flex;flex-wrap:wrap;gap:2px 12px;margin-bottom:2px}
+.report-present .report-context small{display:inline}
+.report-present .report-toolbar{padding:6px 0;margin-bottom:12px}
+.tab-overview .result-insights{margin:0 0 12px}
+.tab-overview .takeaway-heading{gap:16px;margin-bottom:10px}
+.tab-overview .takeaway-heading .eyebrow{font-size:10px;letter-spacing:1px}
+.tab-overview .takeaway-heading h2{font-size:23px;margin:3px 0}
+.tab-overview .takeaway-heading p{font-size:13px;margin:3px 0;max-width:none;line-height:1.5}
+.tab-overview .insight-cards{grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.tab-overview .insight-cards .insight-card{display:flex;flex-direction:column;padding:12px 14px;gap:0}
+.tab-overview .insight-topline>strong{font-size:20px}
+.tab-overview .insight-card h3{font-size:15px;margin:5px 0 0}
+.tab-overview .insight-action{margin-top:3px;line-height:1.4}
+.tab-overview .insight-location{font-size:12px;margin:3px 0 6px;line-height:1.5}
+.insight-reason{font-size:12px;margin:0 0 8px;color:var(--muted)}
+.insight-reason summary{cursor:pointer;width:fit-content}
+.insight-reason summary:hover{color:var(--text)}
+.tab-overview .insight-reason .insight-step{margin:6px 0 0;font-size:12px;line-height:1.5}
+.tab-overview .insight-card .review-item{width:100%;max-width:none;margin-top:auto;padding:5px 8px;font-size:12px;min-height:30px;white-space:normal;text-align:left}
+.insight-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:auto;flex-wrap:wrap}
+.insight-footer .insight-reason{margin:0;flex:1 1 auto}
+.insight-footer .insight-reason[open]{flex-basis:100%}
+.tab-overview .insight-footer .review-item{width:auto;margin:0;max-width:100%}
+.overview-metrics{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:12px;margin-bottom:12px;align-items:start}
+.overview-metrics>.panel{padding:12px 14px;margin:0;min-width:0}
+.overview-metrics .measurement-heading{font-size:13px;gap:4px 12px;margin-bottom:8px}
+.overview-metrics .measurement-heading>span{font-size:12px}
+.overview-metrics .measurement-strip{height:6px;margin-bottom:5px}
+.overview-metrics .measurement-legend{gap:2px}
+.overview-metrics .measurement-part{min-width:145px;padding:5px 4px;gap:2px 6px}
+.overview-metrics .measurement-part>span{font-size:12px}
+.overview-metrics .measurement-part>strong{font-size:15px}
+.overview-metrics .measurement-part>small{font-size:11px;line-height:1.4}
+.overview-metrics .measurement-explanation{margin-top:5px;font-size:11px;gap:4px 12px}
+.overview-metrics .scan-comparison .section-heading{margin-bottom:6px;gap:6px 12px;align-items:center}
+.overview-metrics .scan-comparison h2{font-size:15px;margin:0;letter-spacing:0}
+.overview-metrics .scan-comparison button{padding:5px 8px;font-size:12px}
+.overview-metrics .scan-comparison>.muted{font-size:12px;margin:6px 0 0}
+.overview-metrics .comparison-totals{gap:6px 24px;margin:8px 0}
+.overview-metrics .comparison-totals>span{gap:1px;font-size:11px}
+.overview-metrics .comparison-totals strong{font-size:19px}
+.overview-metrics .comparison-details{margin-top:8px;padding-top:6px}
+.overview-metrics .comparison-details summary{font-size:12px}
+.overview-metrics .unclassified-change{font-size:12px;margin-bottom:0}
+.tab-overview .distribution-panel{padding:14px 16px;margin-bottom:12px}
+.tab-overview .distribution-panel .section-heading{gap:8px 16px;margin-bottom:6px}
+.tab-overview .distribution-panel .section-heading p{margin-top:3px;font-size:12px}
+.tab-overview .distribution-content{grid-template-columns:200px minmax(0,1fr);gap:20px;padding:0}
+.tab-overview .donut-shell{max-width:200px}
+.tab-overview .donut-center>strong{font-size:23px}
+.tab-overview .distribution-panel .storage-bars.distribution-legend{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 20px}
+.tab-overview .distribution-legend button.storage-bar{display:grid;grid-template-columns:minmax(0,1fr) auto 44px;gap:5px 8px;padding:8px 0;align-items:center}
+.tab-overview .distribution-legend .storage-bar-label{display:contents}
+.tab-overview .distribution-share{display:block;margin:0;text-align:right}
+.tab-overview .distribution-share>span{display:none}
+.tab-overview .distribution-legend .storage-track{grid-column:1/-1;height:4px}
+.tab-overview .distribution-note{font-size:11px;margin-top:5px}
+.tab-overview .cleanup-overview{margin:12px 0;padding:14px 16px}
+.tab-overview .cleanup-overview .section-heading{margin-bottom:6px}
+.tab-overview .cleanup-overview p{margin:5px 0}
+.tab-overview .cleanup-cards{gap:10px;margin:10px 0}
+.tab-overview .cleanup-cards article,.tab-overview .cleanup-empty{padding:12px}
+@media(max-width:1000px){
+  .overview-metrics{grid-template-columns:1fr}
+  .tab-overview .insight-cards{grid-template-columns:1fr}
+  .tab-overview .insight-cards .insight-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 14px}
+  .tab-overview .insight-topline{grid-column:1/-1}
+  .tab-overview .insight-card h3,.tab-overview .insight-action,.tab-overview .insight-location,.tab-overview .insight-reason{grid-column:1}
+  .tab-overview .insight-card .review-item{grid-column:2;grid-row:2/6;width:auto;align-self:center;margin:0;max-width:180px}
+  .tab-overview .insight-footer{grid-column:2;grid-row:2/6;max-width:180px;align-self:center;justify-content:flex-end}
+  .tab-overview .insight-reason{margin-bottom:0}
+  .tab-overview .distribution-content{grid-template-columns:180px minmax(0,1fr);gap:16px}
+  .tab-overview .donut-shell{max-width:180px}
+  .tab-overview .donut-center>strong{font-size:20px}
+  .tab-overview .distribution-panel .storage-bars.distribution-legend{grid-template-columns:1fr}
+}
+@media(max-width:600px){
+  .devspace-vscode .report-present main{padding:10px}
+  .tab-overview .takeaway-heading h2{font-size:21px}
+  .tab-overview .insight-cards .insight-card{display:flex;padding:12px}
+  .tab-overview .insight-card .review-item{width:100%;max-width:none;margin-top:8px}
+  .tab-overview .insight-footer{max-width:none;width:100%}
+  .tab-overview .insight-footer .review-item{width:auto;margin:0}
+  .tab-overview .distribution-content{grid-template-columns:1fr;gap:6px}
+  .tab-overview .distribution-panel .storage-bars.distribution-legend{grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 14px}
+  .overview-metrics .measurement-part{min-width:180px}
+}
+@media(max-width:440px){
+  .tab-overview .distribution-panel .storage-bars.distribution-legend{grid-template-columns:1fr}
+  .overview-metrics .measurement-part{min-width:100%}
+}

@@ -2,7 +2,7 @@
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
   "description": "Read-only developer storage analysis with interactive maps and practical cleanup guidance.",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "publisher": "RobbanHoglund",
   "license": "UNLICENSED",
   "repository": {
@@ -58,7 +58,7 @@
       },
       {
         "command": "devspace.scanFolder",
-        "title": "Scan Folder\u2026",
+        "title": "Scan Folder…",
         "category": "DevSpace",
         "icon": "$(folder-opened)",
         "enablement": "isWorkspaceTrusted && !remoteName && !devspace.scanning"

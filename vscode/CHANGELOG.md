@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.1
+
+- Make Overview compact by default: use the editor width, show summary and scan comparison side by side, condense distribution rows and expand recommendation reasons on demand.
+- Reuse Windows directory-entry metadata instead of reopening each file for its size. Recheck directories before traversal and retain link/reparse-point exclusions.
+- Skip missing project/Git marker probes using a bounded directory-name lookahead; wide or unreadable listings retain the original checks.
+- Avoid per-file progress-path allocation and duplicate aggregate metadata lookups.
+- Compare complete reports and scan times against 0.4.0 on the same flat/deep 100,100-file fixtures in Windows/Linux CI.
+
 ## 0.4.0
 
 - Replace native cache execution with **How to clean up**: copy-only npm/pnpm/pip instructions, exact cache paths, effects, official documentation and explicit same-scope rescan comparison.
