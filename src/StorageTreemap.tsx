@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { bytes, visiblePath } from './analysis';
 import { layoutTreemap, mapColor, percentage, sumEntries, visibleEntries, type MapEntry, type MapRect } from './treemap';
@@ -54,7 +55,7 @@ export function StorageTreemap({ entries, trail, onTrailChange, onOpen, page, on
       {...interaction(entry, parent)}>
       <span className="map-tile-name">{entry.name}</span><strong>{bytes(entry.value)}</strong>
       <span className="map-tile-share">{percentage(entry.value, parent?.value ?? total)}{entry.partial ? ' · partial' : ''}</span>
-      {!compact && !header && <span className="map-tile-action">{entry.kind === 'folder' ? 'Explore folder →' : entry.children?.length ? 'Explore group →' : entry.kind === 'filtered' ? 'Clear filter →' : 'Size details'}</span>}
+      {!compact && !header && <span className="map-tile-action">{entry.kind === 'folder' ? 'Explore folder' : entry.children?.length ? 'Explore group' : entry.kind === 'filtered' ? 'Clear filter' : 'Size details'}{(entry.kind === 'folder' || entry.children?.length || entry.kind === 'filtered') && <Icon name="arrow"/>}</span>}
     </button>;
   };
   return <section className="folder-map" aria-label="Interactive folder map">
@@ -86,11 +87,11 @@ export function StorageTreemap({ entries, trail, onTrailChange, onOpen, page, on
           <button className={`storage-entry ${entry.kind === 'folder' ? 'storage-folder' : ''}`} data-navigation-id={entry.kind === 'folder' ? `storage-row-${entry.id.slice(7)}` : `legend-${entry.id}`} title={entry.path ? visiblePath(entry.path) : entry.detail}
             onClick={() => activate(entry)} onFocus={() => { setHovered(null); setFocused({ entry }); }} onBlur={() => setFocused(null)}>
             <i className="map-swatch" aria-hidden="true"/><span className="storage-entry-name">{entry.name}<small>{entry.files !== undefined ? `${entry.files.toLocaleString()} files` : entry.kind === 'files' || entry.kind === 'group' ? 'Explore group' : entry.kind === 'file' ? 'File sample' : 'Measured bytes'}{entry.partial ? ' · partial' : ''}</small></span>
-            <span className="storage-size">{bytes(entry.value)}<small>{percentage(entry.value, total)}</small></span><span className="storage-entry-arrow" aria-hidden="true">{entry.kind === 'folder' || entry.children?.length || entry.kind === 'filtered' ? '›' : ''}</span>
+            <span className="storage-size">{bytes(entry.value)}<small>{percentage(entry.value, total)}</small></span><span className="storage-entry-arrow" aria-hidden="true">{(entry.kind === 'folder' || entry.children?.length || entry.kind === 'filtered') && <Icon name="next"/>}</span>
           </button>
           {renderReview(entry)}
         </div>)}{!rows.length && <p className="muted">No retained items in this view.</p>}</div>
-        {rows.length > pageSize && <div className="pagination"><span>{shownPage * pageSize + 1}–{Math.min(rows.length, (shownPage + 1) * pageSize)} of {rows.length} items</span><div><button disabled={!shownPage} onClick={() => onPageChange(shownPage - 1)}>Previous</button><button disabled={(shownPage + 1) * pageSize >= rows.length} onClick={() => onPageChange(shownPage + 1)}>Next</button></div></div>}
+        {rows.length > pageSize && <div className="pagination"><span>{shownPage * pageSize + 1}–{Math.min(rows.length, (shownPage + 1) * pageSize)} of {rows.length} items</span><div><button disabled={!shownPage} onClick={() => onPageChange(shownPage - 1)}><Icon name="previous"/>Previous</button><button disabled={(shownPage + 1) * pageSize >= rows.length} onClick={() => onPageChange(shownPage + 1)}>Next<Icon name="next"/></button></div></div>}
       </section>
     </div>
   </section>;

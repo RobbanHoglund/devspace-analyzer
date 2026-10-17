@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useState } from 'react';
 import { DocumentationLink } from './DocumentationLink';
 import { reviewPlan } from './reviewPlan';
@@ -20,7 +21,7 @@ export function ReviewPlan({ finding, projects, protectedPaths, demo }: { findin
     <div className="plan-step"><h4>Next step</h4><p>{plan.action}</p></div>
     <div className="plan-step"><h4>How to recover</h4><p>{plan.recovery}</p></div>
     <div className="plan-step"><h4>What it costs</h4><p>{plan.tradeoff}</p></div>
-    {plan.command && <details className="plan-command"><summary>{demo ? 'Example command · demo only' : plan.command.label}</summary><p>{plan.command.note}</p><span className="tiny muted">Working directory</span><p className="mono">{visiblePath(plan.directory ?? '')}</p><pre><code>{plan.command.text}</code></pre><button onClick={copy}>{demo ? 'Copy example command' : 'Copy command'}</button><p role="status">{copyState}</p></details>}
-    {plan.documentation && <DocumentationLink href={plan.documentation}>Tool documentation ↗</DocumentationLink>}
+    {plan.command && <details className="plan-command"><summary>{demo ? 'Example command · demo only' : plan.command.label}</summary><p>{plan.command.note}</p><span className="tiny muted">Working directory</span><p className="mono">{visiblePath(plan.directory ?? '')}</p><pre><code>{plan.command.text}</code></pre><button onClick={copy}><Icon name="copy"/>{demo ? 'Copy example command' : 'Copy command'}</button><p role="status">{copyState}</p></details>}
+    {plan.documentation && <DocumentationLink href={plan.documentation}>Tool documentation</DocumentationLink>}
   </section>;
 }

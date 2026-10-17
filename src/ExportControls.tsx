@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import {useEffect, useRef} from 'react';
 interface Props {redacted: boolean; onRedactedChange: (value:boolean)=>void; exporting:boolean; onExport:(format:'json'|'md')=>void}
 export function ExportControls({redacted,onRedactedChange,exporting,onExport}:Props) {
@@ -9,14 +10,14 @@ export function ExportControls({redacted,onRedactedChange,exporting,onExport}:Pr
   const save=(format:'json'|'md')=>{if(menu.current)menu.current.open=false;onExport(format);};
   return <footer className="export-bar export-controls" aria-label="Export report">
     <details ref={menu} className="export-options" onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();if(menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus();}}}}>
-      <summary>Export <span className="export-choice">{redacted?'Redacted':'Full'}</span></summary>
+      <summary><Icon name="download"/>Export <span className="export-choice">{redacted?'Redacted':'Full'}</span><Icon name="down" className="export-chevron"/></summary>
       <div className="export-popover">
         <fieldset className="export-mode"><legend>Export content</legend>
           <label><input type="radio" name="export-mode" checked={redacted} onChange={()=>onRedactedChange(true)}/>Redacted summary</label>
           <label><input type="radio" name="export-mode" checked={!redacted} onChange={()=>onRedactedChange(false)}/>Full report</label>
         </fieldset>
         <p className="export-mode-help">{redacted?'Paths, project names and detailed evidence are withheld.':'Includes paths, project names, branches and detailed analysis. Review before sharing.'} No cleanup has been performed.</p>
-        <div className="export-formats"><button onClick={()=>save('md')} disabled={exporting}>Export Markdown</button><button onClick={()=>save('json')} disabled={exporting}>Export JSON</button></div>
+        <div className="export-formats"><button onClick={()=>save('md')} disabled={exporting}><Icon name="download"/>Export Markdown</button><button onClick={()=>save('json')} disabled={exporting}><Icon name="download"/>Export JSON</button></div>
       </div>
     </details>
   </footer>;

@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import {useMemo} from 'react';
 import type {Report} from './types';
 import {visiblePath} from './analysis';
@@ -34,7 +35,7 @@ export function WarningBrowser({report,view,onChange}:Props) {
         <summary><code>{warning.code}</code><span className="mono">{visiblePath(warning.path)}</span></summary><p>{warning.message}</p>
       </details>)}</div>
       {!filtered.length && <p>No retained warning details match these filters.</p>}
-      <div className="pagination"><span>{filtered.length ? `${start+1}–${Math.min(start+25,filtered.length)} of ${filtered.length} retained details` : '0 matching details'}</span><div><button disabled={page===0} onClick={()=>onChange({...view,page:page-1})}>Previous warnings</button><button disabled={page>=last} onClick={()=>onChange({...view,page:page+1})}>Next warnings</button></div></div>
+      <div className="pagination"><span>{filtered.length ? `${start+1}–${Math.min(start+25,filtered.length)} of ${filtered.length} retained details` : '0 matching details'}</span><div><button disabled={page===0} onClick={()=>onChange({...view,page:page-1})}><Icon name="previous"/>Previous warnings</button><button disabled={page>=last} onClick={()=>onChange({...view,page:page+1})}>Next warnings<Icon name="next"/></button></div></div>
     </>}
   </section>;
 }

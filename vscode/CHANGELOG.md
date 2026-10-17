@@ -2,6 +2,7 @@
 
 ## 1.0.0
 
+- Consistent compact SVG action icons across all views, including folder breakdown, review exclusions, manual guidance, copy, export and navigation. Labels and keyboard access are retained.
 - First stable release scope: VS Code in local desktop windows on Windows x64, Linux x64 and macOS Intel/Apple silicon. Desktop remains an unsigned preview.
 - Adopt Apache-2.0, matching JVMScope, with LICENSE, NOTICE and dependency notices bundled and verified.
 - Remove the extension Preview flag and align source/package versions.

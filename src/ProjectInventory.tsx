@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useMemo } from 'react';
 import type { Project } from './types';
 import { bytes, visiblePath } from './analysis';
@@ -21,7 +22,7 @@ export function ProjectInventory({projects, view, onChange, onInspect}: Props) {
       <input aria-label="Search projects" placeholder="Search project names or paths…" value={view.query} onChange={e => change({query:e.target.value})}/>
       <select aria-label="Project ecosystem" value={view.ecosystem} onChange={e => change({ecosystem:e.target.value})}><option value="all">All ecosystems</option>{ecosystems.map(eco => <option key={eco}>{eco}</option>)}</select>
       <select aria-label="Sort projects" value={view.sort} onChange={e => change({sort:e.target.value})}><option value="size">Largest owned size</option><option value="artifacts">Largest artifacts</option><option value="name">Name A–Z</option></select>
-      {(view.query || view.ecosystem !== 'all') && <button className="text-button" onClick={() => onChange({...emptyProjectView, sort:view.sort})}>Clear project filters</button>}
+      {(view.query || view.ecosystem !== 'all') && <button className="text-button" onClick={() => onChange({...emptyProjectView, sort:view.sort})}><Icon name="filterClear"/>Clear project filters</button>}
     </div>
     <div className="table-scroll"><table><thead><tr><th>Project / path</th><th>Build context</th><th>Dependency evidence</th><th className="number">Owned logical size</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>
       {filtered.slice(bounds.start,bounds.end).map(p => <tr key={p.id}>
@@ -29,10 +30,10 @@ export function ProjectInventory({projects, view, onChange, onInspect}: Props) {
         <td><div className="tags">{p.ecosystems.map(e => <span key={e} className={`eco-label eco-${e}`}>{e}</span>)}</div>{p.wrapperVersion && <small>Gradle wrapper {p.wrapperVersion}</small>}</td>
         <td>{p.lockfiles.length ? <><strong>{p.lockfiles.length} lockfile marker(s)</strong><small className="wrap">{p.lockfiles.join(', ')}</small></> : <span className="muted">No recognized lockfile</span>}<small>Reproducibility not verified</small></td>
         <td className="number project-size"><strong>{bytes(p.ownedLogicalBytes)}</strong><small>{bytes(p.artifactBytes)} identified artifacts</small>{p.contextOnly && <small className="wrap">Context from parent · sizes within selected scope only</small>}</td>
-        <td><button onClick={() => onInspect(p.id)}>Inspect<span aria-hidden="true">→</span></button></td>
+        <td><button onClick={() => onInspect(p.id)}><Icon name="search"/>Inspect</button></td>
       </tr>)}
     </tbody></table></div>
     {!filtered.length && <div className="empty-results">{projects.length ? 'No projects match these filters.' : 'No project markers found. Shared-cache-only scans may have no projects.'}</div>}
-    <div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total} projects` : '0 projects'}</span><div><button disabled={bounds.page === 0} onClick={() => onChange({...view,page:bounds.page-1})}>Previous</button><button disabled={bounds.page >= bounds.last} onClick={() => onChange({...view,page:bounds.page+1})}>Next</button></div></div>
+    <div className="pagination"><span>{bounds.total ? `${bounds.from}–${bounds.end} of ${bounds.total} projects` : '0 projects'}</span><div><button disabled={bounds.page === 0} onClick={() => onChange({...view,page:bounds.page-1})}><Icon name="previous"/>Previous</button><button disabled={bounds.page >= bounds.last} onClick={() => onChange({...view,page:bounds.page+1})}>Next<Icon name="next"/></button></div></div>
   </section>;
 }

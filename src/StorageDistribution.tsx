@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useState } from 'react';
 import { bytes } from './analysis';
 import { unclassifiedMeasuredBytes } from './measurement';
@@ -21,7 +22,7 @@ export function StorageDistribution({ report, groups, onEcosystem, onOther, onAl
   const activate = (entry: typeof entries[number]) => entry.ecosystem ? onEcosystem(entry.ecosystem) : onOther();
   let angle = 0;
   return <section className="panel chart-panel ecosystem-overview distribution-panel" aria-label="Storage distribution">
-    <div className="section-heading"><div><h2>Storage distribution</h2><p className="muted">Select a segment to inspect its findings or explore unclassified files.</p></div><div className="distribution-actions"><button onClick={onAllStorage}>Explore all folders →</button><span className="distribution-basis">{report.complete ? 'Measured within scope' : 'Partial scan · measured bytes only'}</span></div></div>
+    <div className="section-heading"><div><h2>Storage distribution</h2><p className="muted">Select a segment to inspect its findings or explore unclassified files.</p></div><div className="distribution-actions"><button onClick={onAllStorage}><Icon name="treemap"/>Explore all folders</button><span className="distribution-basis">{report.complete ? 'Measured within scope' : 'Partial scan · measured bytes only'}</span></div></div>
     <div className="distribution-content"><div className="donut-shell">
       <svg viewBox="0 0 300 300" className="distribution-ring" role="group" aria-label="Storage share by category">
         {!total && <circle cx="150" cy="150" r="112" fill="none" stroke="var(--border)" strokeWidth="36"/>}
@@ -32,7 +33,7 @@ export function StorageDistribution({ report, groups, onEcosystem, onOther, onAl
         })}
       </svg><div className="donut-center" aria-hidden="true"><span>{selected?.name ?? (other === null ? 'Identified data' : 'Total measured')}</span><strong>{bytes(selected?.value ?? total)}</strong><small>{selected ? percentage(selected.value, total) : `${entries.length} ${entries.length === 1 ? 'category' : 'categories'}`}</small></div>
     </div><div className="storage-bars distribution-legend" aria-label="Storage by ecosystem">{entries.map(entry => <button className={`storage-bar eco-${entry.ecosystem ?? 'Other'}`} key={entry.key} aria-label={`${entry.name}, ${bytes(entry.value)}, ${percentage(entry.value, total)}. ${entry.ecosystem ? 'Inspect findings' : 'Explore files'}`} data-navigation-id={`distribution-legend-${entry.key}`} onClick={() => activate(entry)} onMouseEnter={() => setActive(entry.key)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(entry.key)} onBlur={() => setActive(null)}>
-      <span className="storage-bar-label"><span><i className={`dot eco-${entry.ecosystem ?? 'Other'}`}/>{entry.name}</span><strong>{bytes(entry.value)}</strong></span><span className="distribution-share">{percentage(entry.value, total)}<span>{entry.ecosystem ? 'Inspect findings →' : 'Explore folders →'}</span></span><span className="storage-track" aria-hidden="true"><span style={{ width: `${entry.value / Math.max(total, 1) * 100}%` }}/></span>
+      <span className="storage-bar-label"><span><i className={`dot eco-${entry.ecosystem ?? 'Other'}`}/>{entry.name}</span><strong>{bytes(entry.value)}</strong></span><span className="distribution-share">{percentage(entry.value, total)}<span>{entry.ecosystem ? 'Inspect findings' : 'Explore folders'} <Icon name="arrow"/></span></span><span className="storage-track" aria-hidden="true"><span style={{ width: `${entry.value / Math.max(total, 1) * 100}%` }}/></span>
     </button>)}{!entries.length && <p>No measured storage in this scan.</p>}</div></div>
     {other === null && <p className="tiny muted">Measured and classified totals are inconsistent. This chart shows identified data only.</p>}
     <p className="tiny muted distribution-note">Logical file sizes. Category colors do not indicate what can be deleted.</p>

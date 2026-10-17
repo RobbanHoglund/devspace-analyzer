@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useId, useState, type Dispatch, type SetStateAction } from 'react';
 import { pathsOverlap, removeProtectionRule, samePath, visiblePath } from './analysis';
 import type { Finding } from './types';
@@ -22,8 +23,8 @@ export function ProtectionControls({ finding, findings, paths, setPaths }: Props
   };
 
   return <>
-    {!matching.length && <button aria-describedby={helpId} onClick={() => setPaths(previous => [...previous, finding.path])}>Exclude from review</button>}
-    {direct && <button aria-describedby={helpId} onClick={() => remove(finding.path)}>Remove my exclusion</button>}
+    {!matching.length && <button aria-describedby={helpId} onClick={() => setPaths(previous => [...previous, finding.path])}><Icon name="eyeOff"/>Exclude from review</button>}
+    {direct && <button aria-describedby={helpId} onClick={() => remove(finding.path)}><Icon name="eye"/>Remove my exclusion</button>}
     <p id={helpId} className="protection-help">{matching.length ? 'Your preference keeps this finding out of review suggestions. It still appears in scan results and counts as Protected.' : 'Keeps this folder in scan results, but counts it as Protected and excludes it from review suggestions.'} This also applies to findings inside the folder or containing it. It does not lock or back up files.</p>
     {shared.length > 0 && <section className="note" aria-label="Shared protection rules">
       <h3>Excluded by another folder preference</h3>
@@ -35,9 +36,9 @@ export function ProtectionControls({ finding, findings, paths, setPaths }: Props
           <p>Applies to {affected} {affected === 1 ? 'finding' : 'findings'} in this report. Paths outside this scan may also be affected.</p>
           {pendingRule === rule ? <>
             <p>Removing this rule affects all paths it covers. Other saved preferences and the scanner’s protected categories still apply.</p>
-            <button onClick={() => remove(rule)}>Remove rule for all covered paths</button>
-            <button onClick={() => setPendingRule(null)}>Keep exclusion</button>
-          </> : <button onClick={() => setPendingRule(rule)}>Review removal</button>}
+            <button onClick={() => remove(rule)}><Icon name="eye"/>Remove rule for all covered paths</button>
+            <button onClick={() => setPendingRule(null)}><Icon name="eyeOff"/>Keep exclusion</button>
+          </> : <button onClick={() => setPendingRule(rule)}><Icon name="search"/>Review removal</button>}
         </div>;
       })}
     </section>}

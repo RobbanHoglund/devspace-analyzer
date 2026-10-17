@@ -17,14 +17,14 @@ test('chart drill-through restores the overview position and supports keyboard f
   await page.keyboard.press('Alt+ArrowRight');
   await expect(page.getByLabel('Ecosystem filter')).toHaveValue('Gradle');
   await page.keyboard.press('Alt+ArrowLeft');
-  await chart.getByRole('button', { name: 'Explore all folders →' }).click();
+  await chart.getByRole('button', { name: 'Explore all folders' }).click();
   await expect(page.getByRole('region', { name: 'Storage breakdown' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Go forward', exact: true })).toBeDisabled();
 });
 
 test('one history includes folder filters, files groups and parent navigation', async ({ page }) => {
   await loadReport(page, storageMapReport());
-  await page.getByRole('button', { name: 'Explore all folders →' }).click();
+  await page.getByRole('button', { name: 'Explore all folders' }).click();
   const map = page.getByRole('region', { name: 'Interactive folder map' });
   const back = page.getByRole('button', { name: 'Go back', exact: true });
   const forward = page.getByRole('button', { name: 'Go forward', exact: true });
@@ -51,7 +51,7 @@ test('one history includes folder filters, files groups and parent navigation', 
 for (const width of [380, 1440]) test(`reviewing a folder and returning restores its filter and exact location at ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height: 900 });
   await loadReport(page, storageMapReport());
-  await page.getByRole('button', { name: 'Explore all folders →' }).click();
+  await page.getByRole('button', { name: 'Explore all folders' }).click();
   await page.getByRole('button', { name: /^Open folder: Workspace,/ }).click();
   await page.getByLabel('Filter child folders').fill('build');
   await page.getByRole('button', { name: 'Review Gradle build output', exact: true }).click();
@@ -75,7 +75,7 @@ for (const width of [380, 1440]) test(`deep paths have reachable ancestors and s
     return { ...prototype, id, path, parentId: id === 0 ? null : id - 1, classifiedBytes: 0, directFileBytes: id === 9 ? prototype.logicalBytes : 0, directFiles: id === 9 ? 2 : 0, largestFiles: [] };
   });
   await loadReport(page, report);
-  await page.getByRole('button', { name: 'Explore all folders →' }).click();
+  await page.getByRole('button', { name: 'Explore all folders' }).click();
   for (const name of ['Workspace', 'level-1', 'level-2', 'level-3', 'level-4', 'level-5']) await page.getByRole('button', { name: new RegExp(`^Open folder: ${name},`) }).click();
   const crumbs = page.getByRole('navigation', { name: 'Storage path' });
   await crumbs.getByLabel('Show parent folders').click();
@@ -98,7 +98,7 @@ for (const width of [380, 1440]) test(`deep paths have reachable ancestors and s
 
 test('demo has separate navigation history and a fresh scan clears the old report history', async ({ page }) => {
   await loadReport(page, storageMapReport());
-  await page.getByRole('button', { name: 'Explore all folders →' }).click();
+  await page.getByRole('button', { name: 'Explore all folders' }).click();
   await page.getByRole('button', { name: /^Open folder: Workspace,/ }).click();
   await page.getByRole('button', { name: /^Open folder: build,/ }).click();
   await page.getByRole('button', { name: 'Scan settings', exact: true }).click();

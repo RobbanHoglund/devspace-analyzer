@@ -9,4 +9,5 @@ import './storage-charts.css';
 import './navigation.css';
 import './cleanup.css';
 import './overview.css';
+import './icons.css';
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>);

@@ -1,9 +1,10 @@
+import { Icon } from './Icon';
 type Crumb = { key: string; label: string; title: string; onSelect: () => void };
 
 export function StorageBreadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
   const hidden = crumbs.length > 4 ? crumbs.slice(1, -2) : [];
   const item = (crumb: Crumb, current: boolean) => <li key={crumb.key}>
-    <button title={crumb.title} aria-label={crumb.key === 'roots' ? 'All scanned locations' : undefined} aria-current={current ? 'location' : undefined} onClick={crumb.onSelect}>{crumb.key === 'roots' && <svg className="crumb-home" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true"><path d="m3 10 9-7 9 7v11h-6v-7H9v7H3z"/></svg>}<span>{crumb.label}</span></button>
+    <button title={crumb.title} aria-label={crumb.key === 'roots' ? 'All scanned locations' : undefined} aria-current={current ? 'location' : undefined} onClick={crumb.onSelect}>{crumb.key === 'roots' && <Icon name="home" className="crumb-home"/>}<span>{crumb.label}</span></button>
   </li>;
   return <nav className="storage-crumbs" aria-label="Storage path"><ol>
     {item(crumbs[0], crumbs.length === 1)}

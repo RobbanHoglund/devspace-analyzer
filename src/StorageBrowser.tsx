@@ -1,3 +1,4 @@
+import { Icon } from './Icon';
 import { useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { bytes, visiblePath } from './analysis';
 import { findingTitle, folderName } from './insights';
@@ -52,11 +53,11 @@ export function StorageBrowser({ report, view, onChange, onInspect, onReveal }: 
   ];
   return <section className="storage-browser panel" aria-label="Storage breakdown">
     <div ref={navigation} className="storage-navigation">
-      <div className="storage-location-bar"><button className="storage-up" aria-label="Up one level" title="Up to the parent folder or group (Alt+Up)" disabled={!current && !trail.length} onClick={up}>↑ Up</button><StorageBreadcrumbs crumbs={breadcrumbs}/></div>
+      <div className="storage-location-bar"><button className="storage-up" aria-label="Up one level" title="Up to the parent folder or group (Alt+Up)" disabled={!current && !trail.length} onClick={up}><Icon name="up"/>Up</button><StorageBreadcrumbs crumbs={breadcrumbs}/></div>
       <div className="storage-heading"><h2 ref={heading} tabIndex={-1}>{trail.at(-1)?.name ?? (current ? folderName(current.path) : 'All scanned locations')}</h2><strong>{bytes(trail.at(-1)?.value ?? totalMetric)}<small>{trail.length ? 'in this group' : view.unclassified ? 'other measured files' : 'measured here'}</small></strong></div>
     </div>
     {!directories.length ? <div className="storage-empty"><h3>Run a new scan to capture the folder breakdown.</h3><p>{report.storage ? 'No folder detail was captured in this scan. Check scan coverage before trying again.' : 'This older report contains category totals only. No folder sizes have been inferred.'}</p></div> : <>
-      {current && <div className="storage-location"><span className="mono" title={visiblePath(current.path)}>{visiblePath(current.path)}</span><button disabled={!onReveal} onClick={() => void onReveal?.(current.id)}>Show in file manager</button></div>}
+      {current && <div className="storage-location"><span className="mono" title={visiblePath(current.path)}>{visiblePath(current.path)}</span><button disabled={!onReveal} onClick={() => void onReveal?.(current.id)}><Icon name="folder"/>Show in file manager</button></div>}
       <div className="storage-view-options"><label><input type="checkbox" checked={view.unclassified} onChange={e => { onChange({ ...view, unclassified: e.target.checked, groups: [], page: 0 }); focusMap(); }}/>Other measured files only</label><input aria-label="Filter child folders" placeholder="Filter folders here…" value={query} onChange={e => setQuery(e.target.value)}/></div>
       {view.unclassified && <p className="storage-note">These files did not match a supported developer-storage category. Their contents and recoverability have not been assessed.</p>}
       {current && !current.complete && <p className="storage-note">Partial measurement: unread or skipped files are not included.</p>}
@@ -64,7 +65,7 @@ export function StorageBrowser({ report, view, onChange, onInspect, onReveal }: 
         entries={mapEntries} trail={trail} onTrailChange={openGroup} page={page} onPageChange={setPage} consistent={consistent}
         renderReview={entry => {
           const finding = entry.path ? findingByPath.get(pathKey(entry.path)) : undefined;
-          return finding && <button className="storage-review" onClick={() => onInspect(finding)}>Review {findingTitle(finding)}</button>;
+          return finding && <button className="storage-review" onClick={() => onInspect(finding)}><Icon name="search"/>Review {findingTitle(finding)}</button>;
         }}
         onOpen={(entry, parent) => {
           if (entry.kind === 'filtered') setQuery('');

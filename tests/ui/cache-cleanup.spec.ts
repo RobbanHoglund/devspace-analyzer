@@ -29,7 +29,7 @@ async function setup(page: Page, options: { protected?: boolean; partial?: boole
 }
 test('guidance copies the exact scoped command without execution, then explicitly compares a rescan', async ({page}) => {
   await setup(page);
-  await page.getByRole('button',{name:'How to clean up →'}).click();
+  await page.getByRole('button',{name:'How to clean up'}).click();
   const dialog = page.getByRole('dialog',{name:'Manual cleanup guide'});
   await expect(dialog.getByRole('region',{name:'Measured cache'})).toContainText('1 KiB');
   await dialog.getByRole('radio',{name:'Clear npm package cache',exact:true}).check();
@@ -40,7 +40,7 @@ test('guidance copies the exact scoped command without execution, then explicitl
   expect(calls.some((c:{command:string})=>/cleanup/.test(c.command))).toBe(false);
   expect(await page.evaluate(()=>localStorage.getItem('guidance-scans'))).toBe('1');
   await expect(dialog.getByRole('button',{name:/^Run /})).toHaveCount(0);
-  await dialog.getByRole('link',{name:'Official tool documentation ↗'}).click();
+  await dialog.getByRole('link',{name:'Official tool documentation'}).click();
   expect(await page.evaluate(()=>JSON.parse(localStorage.getItem('guidance-calls')!).some((c:{command:string})=>c.command==='open_documentation'))).toBe(true);
   await dialog.getByRole('button',{name:'Scan again',exact:true}).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
@@ -48,7 +48,7 @@ test('guidance copies the exact scoped command without execution, then explicitl
 });
 test('guidance fits a narrow editor and Escape restores focus', async ({page}) => {
   await page.setViewportSize({width:560,height:700}); await setup(page);
-  const opener = page.getByRole('button',{name:'How to clean up →'}); await opener.click();
+  const opener = page.getByRole('button',{name:'How to clean up'}); await opener.click();
   const dialog=page.getByRole('dialog');
   expect(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1)).toBe(true);
   await expect(dialog.getByRole('button',{name:'Close cleanup guidance'})).toBeVisible();
@@ -57,12 +57,12 @@ test('guidance fits a narrow editor and Escape restores focus', async ({page}) =
   await page.keyboard.press('Escape'); await expect(dialog).toHaveCount(0); await expect(opener).toBeFocused();
 });
 for (const option of ['protected','unread'] as const) test(`${option} cache explains the restriction and offers no command`,async({page})=>{
-  await setup(page,{[option]:true}); await page.getByRole('button',{name:'How to clean up →'}).click();
+  await setup(page,{[option]:true}); await page.getByRole('button',{name:'How to clean up'}).click();
   await expect(page.getByRole('dialog').getByRole('button',{name:'Copy command',exact:true})).toHaveCount(0);
   await expect(page.getByRole('dialog').getByRole('link')).toBeVisible();
 });
 test('an unrelated partial scan keeps guidance for a fully measured cache, with an honest baseline notice',async({page})=>{
-  await setup(page,{partial:true}); await page.getByRole('button',{name:'How to clean up →'}).click();
+  await setup(page,{partial:true}); await page.getByRole('button',{name:'How to clean up'}).click();
   await expect(page.getByRole('button',{name:'Copy command',exact:true})).toBeEnabled();
   await expect(page.getByText('This report is incomplete.',{exact:false})).toBeVisible();
 });
