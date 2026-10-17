@@ -149,7 +149,7 @@ try {
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   const maintenance = page.getByRole('region', { name: 'Cache cleanup guidance' });
   await expect(maintenance).toBeVisible();
-  await maintenance.getByRole('button', { name: 'How to clean up →' }).click();
+  await maintenance.getByRole('button', { name: 'How to clean up', exact: true }).click();
   const guide = page.getByRole('dialog', { name: 'Manual cleanup guide' });
   await guide.getByRole('radio', { name: 'Clear npm package cache', exact: true }).check();
   await expect(guide.getByLabel('Cleanup command', { exact: true })).toContainText('cache clean --force');
