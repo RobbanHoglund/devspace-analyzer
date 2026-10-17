@@ -4,9 +4,9 @@
 
 Local storage analyzer for VS Code and a Windows-first desktop preview for local inventory of checked-out projects and shared developer caches. The interface explains what was found, its risk classification and what recovery would involve.
 
-> Version 0.4.2 is fully read-only: identify space, review practical cleanup instructions, copy a command, then scan again after making changes yourself. DevSpace never runs cleanup or project commands. Sizes are logical bytes, not guaranteed physical space savings.
+> Version 1.0.0 for VS Code is fully read-only: identify space, review practical cleanup instructions, copy a command, then scan again after making changes yourself. DevSpace never runs cleanup or project commands. Sizes are logical bytes, not guaranteed physical space savings.
 
-## Layout and performance update 0.4.1
+## Explore your storage
 
 Overview is compact by default, with expandable recommendation reasons and the distribution closer to the summary. Windows scanning reuses directory-entry metadata and skips redundant probes for absent markers. [Changes, measurement method and limits](docs/PERFORMANCE.md).
 
@@ -32,9 +32,9 @@ Follow measured space into individual folders, see the evidence and prerequisite
 - Cancellable native scanning, folder reveal and JSON/Markdown export; redacted summary by default.
 - Explicitly marked synthetic demo data for the browser preview.
 
-## Windows
+## Windows desktop preview
 
-A successful **Windows x64 desktop** job publishes `devspace-windows-x64`, containing the unsigned NSIS installer and executable. Artifacts expire after 14 days. Check the source revision and test result before running a pilot binary.
+A successful **Windows x64 desktop** job publishes `devspace-windows-x64`, containing the unsigned NSIS installer and executable. Artifacts expire after 14 days. Check the source revision and test result before running a preview binary. Desktop remains unsigned and is outside the VS Code 1.0.0 GA release.
 
 To build from source, install Node.js 22.12+, stable Rust/MSVC, Microsoft C++ Build Tools and WebView2 as described in the [Tauri prerequisites](https://v2.tauri.app/start/prerequisites/).
 
@@ -63,7 +63,7 @@ Run `npm ci` and `npm run dev`, open `http://127.0.0.1:1420`, then select **Expl
 | Owned project size | File lengths charged exclusively to that project, excluding nested source projects |
 | Measured files | Files in the effective traversal roots, including unclassified data |
 
-Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this preview. Their Inspect view includes the existing enclosing protected finding with an explanation, without adding findings or reassigning bytes.
+Hardlinks, sparse disks, compression and shared stores can make these numbers differ from allocated or reclaimable disk space. Skipped entries reduce coverage. A protected aggregate is counted once; its nested projects retain exclusive owned bytes but do not have independently classified artifact findings in this version. Their Inspect view includes the existing enclosing protected finding with an explanation, without adding findings or reassigning bytes.
 
 ## Safety and scope
 
@@ -106,8 +106,10 @@ No server, account or database is needed for scanning. The development toolchain
 
 ## VS Code extension
 
-An installable VS Code extension lives in [`vscode/`](vscode/README.md). It reuses the Rust scanner and analysis UI, adds an Activity Bar view and workspace/folder commands, and includes its own scanner binary. Download the matching `devspace-vscode-*` artifact from a successful **VS Code extension** workflow, extract the VSIX, then use **Extensions → … → Install from VSIX…**. Local trusted desktop windows are supported; shared cache scanning is opt-in. See the extension README for installation, platform limits and development checks.
+An installable VS Code extension lives in [`vscode/`](vscode/README.md). It reuses the Rust scanner and analysis UI, adds an Activity Bar view and workspace/folder commands, and includes its own scanner binary. Download the matching `devspace-analyzer-1.0.0-PLATFORM.vsix` from [GitHub Releases](https://github.com/RobbanHoglund/devspace-analyzer/releases), then use **Extensions → … → Install from VSIX…**. Windows x64, Linux x64 (glibc), macOS Intel and Apple silicon packages are available after the release is published; `SHA256SUMS` and `SOURCE.json` accompany each release. Local trusted desktop windows are supported; shared cache scanning is opt-in. See the extension README for installation, platform limits and development checks.
 
-## Release readiness
+## License and release
 
-Version 0.4.2 is a preview, not a GA declaration. See [the GA review](docs/GA_REVIEW.md) for verified coverage and the remaining publication, license and desktop-distribution decisions. The current evaluation license has not been changed.
+DevSpace Analyzer is licensed under [Apache-2.0](LICENSE), matching JVMScope. Packaged dependencies retain their own licenses and are listed in `THIRD_PARTY_NOTICES.txt`. The 1.0.0 GA scope is the VS Code extension; the desktop remains preview.
+
+After both main CI workflows pass, release automation prepares an unpublished draft containing the four verified VSIX packages, checksums and source provenance. The maintainer publishes that draft after final acceptance. See [release instructions](docs/RELEASING.md) and [the GA review](docs/GA_REVIEW.md). Marketplace distribution is separate.

@@ -2,9 +2,9 @@
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
   "description": "Read-only developer storage analysis with interactive maps and practical cleanup guidance.",
-  "version": "0.4.2",
+  "version": "1.0.0",
   "publisher": "RobbanHoglund",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/RobbanHoglund/devspace-analyzer.git"
@@ -58,7 +58,7 @@
       },
       {
         "command": "devspace.scanFolder",
-        "title": "Scan Folder…",
+        "title": "Scan Folder\u2026",
         "category": "DevSpace",
         "icon": "$(folder-opened)",
         "enablement": "isWorkspaceTrusted && !remoteName && !devspace.scanning"
@@ -155,7 +155,7 @@
     "typescript": "5.9.3"
   },
   "icon": "resources/robbanhoglund.png",
-  "preview": true,
+  "preview": false,
   "homepage": "https://github.com/RobbanHoglund/devspace-analyzer#readme",
   "bugs": {
     "url": "https://github.com/RobbanHoglund/devspace-analyzer/issues"

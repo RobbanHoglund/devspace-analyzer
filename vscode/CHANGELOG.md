@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.0
+
+- First stable release scope: VS Code in local desktop windows on Windows x64, Linux x64 and macOS Intel/Apple silicon. Desktop remains an unsigned preview.
+- Adopt Apache-2.0, matching JVMScope, with LICENSE, NOTICE and dependency notices bundled and verified.
+- Remove the extension Preview flag and align source/package versions.
+- Prepare versioned GitHub Release drafts from all four tested main CI packages, with SHA-256 checksums and source provenance. Publication remains explicit.
+- Retain read-only scanning, compact navigation, storage maps, faster scanning and copy-only manual cleanup guidance from the preview.
+
 ## 0.4.2
 
 - Fix case-normalized marker lookups so Windows recognizes Pipfile and Pipfile.lock after the scanning optimization.

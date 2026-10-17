@@ -6,7 +6,7 @@ DevSpace provides **local, read-only storage analysis and practical cleanup guid
 
 ## Install and open
 
-1. Download the ZIP named `devspace-vscode-win32-x64` from a successful **VS Code extension** GitHub Actions run. Extract the `.vsix` file. Choose the matching Linux or Mac artifact on those platforms.
+1. Download `devspace-analyzer-1.0.0-win32-x64.vsix` from [GitHub Releases](https://github.com/RobbanHoglund/devspace-analyzer/releases). Choose `linux-x64`, `darwin-x64` (Intel) or `darwin-arm64` (Apple silicon) on those platforms. Versioned packages become available when the maintainer publishes the release; each release includes `SHA256SUMS` and `SOURCE.json`.
 2. In VS Code, open **Extensions → … → Install from VSIX…** and select the file.
 3. Click the **DevSpace** icon in the Activity Bar, or run **DevSpace: Open Analyzer** in the Command Palette. You can also use **View → Open View… → DevSpace Analyzer**.
 4. Choose **Scan workspace** or **Choose folder to scan…**. You can right-click a local folder in Explorer and choose **DevSpace: Scan Folder…**.
@@ -37,7 +37,7 @@ Review suggestions use project recovery evidence first, then logical size, and e
 
 ## Supported environments
 
-Preview packages: Windows x64, Linux x64 (glibc), macOS x64 and macOS arm64. VS Code 1.85 or later. This release supports **local desktop windows**. Remote SSH, WSL, Dev Containers, virtual workspaces and vscode.dev scanning are outside this release. Open a local VS Code window to scan local folders.
+Version 1.0.0 packages: Windows x64, Linux x64 (glibc), macOS x64 and macOS arm64. VS Code 1.85 or later. This release supports **local desktop windows**. Remote SSH, WSL, Dev Containers, virtual workspaces and vscode.dev scanning are outside this release. Open a local VS Code window to scan local folders.
 
 Restricted Mode permits the demo but blocks real scanning and folder access. No scan starts when the extension activates. The scanner executes no project code, shell command, build, package manager or Git command and makes no network requests. It retains the desktop scanner's conservative protection, link handling, coverage limits and byte accounting.
 
@@ -55,9 +55,9 @@ npm run test:integration --prefix vscode
 
 On headless Linux use `xvfb-run -a npm run test:integration --prefix vscode`. Integration tests install the generated VSIX into an isolated VS Code profile, scan a disposable fixture, inspect the real webview and capture all four built-in theme categories. They do not use your normal editor profile.
 
-The `.vsix` appears under `artifacts/`. Packaging is platform-specific and uses the current machine's architecture. GitHub Actions builds all four variants and retains successful packages for 14 days. The existing desktop build remains available separately.
+The `.vsix` appears under `artifacts/`. Packaging is platform-specific and uses the current machine's architecture. GitHub Actions builds and tests all four variants. CI artifacts expire after 14 days; published GitHub Release assets provide versioned distribution without that expiry. The separate unsigned Windows desktop remains preview and is outside this GA release.
 
-Marketplace publication is a later step. The publisher identifier must be owned by the account that publishes it. This repository has no open-source license declaration; the pilot package retains the author's rights. Packaged third-party license notices are included.
+Licensed under Apache-2.0, matching JVMScope. LICENSE, NOTICE and third-party dependency license notices are included in every package. Installation uses GitHub Releases; Marketplace publication is separate and requires verified publisher ownership.
 
 ## Finding cleanup guidance
 
@@ -65,4 +65,4 @@ Open **Overview → How to clean up**, or choose an npm, pnpm or pip cache in **
 
 Review the target and consequences, choose **Copy command**, and use your own terminal. **Scan again** reuses the report’s original scope. A complete scan is needed for before/after comparison. Protected and partly measured caches do not offer cleanup commands. Demo paths are examples and cannot be copied from cache guidance.
 
-Version 0.4.2 remains a preview pending the release decisions recorded in `docs/GA_REVIEW.md` in the source repository.
+Version 1.0.0 is prepared for the supported local VS Code environments. Release automation creates an unpublished draft only after both main CI workflows pass; publication is an explicit maintainer action. See `docs/RELEASING.md` and `docs/GA_REVIEW.md` in the source repository.

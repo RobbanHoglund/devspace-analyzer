@@ -36,7 +36,7 @@ Overlapping selected roots and shared-cache locations are collapsed to an effect
 
 The scanner does not follow symbolic links, Windows junctions or reparse points. A selected root containing a linked ancestor is rejected. Some cloud-placeholder files are therefore skipped. Sensitive directories such as `.ssh` and `.gnupg`, and major Windows system directories at the drive root, are excluded by default.
 
-Checks are snapshot-based path checks, not a race-free sandbox. A concurrently changed directory can invalidate a previous check. Do not scan actively hostile trees. This pilot does not use handle-relative traversal with operating-system no-follow guarantees. Scanning performs no writes or code execution.
+Checks are snapshot-based path checks, not a race-free sandbox. A concurrently changed directory can invalidate a previous check. Do not scan actively hostile trees. The scanner does not use handle-relative traversal with operating-system no-follow guarantees. Scanning performs no writes or code execution.
 
 Read errors, skipped entries, depth limits, entry limits and cancellation reduce coverage. The UI exposes this; findings with incomplete subtree measurements are excluded from the review-candidate total. Other complete findings can still be shown in a globally partial report.
 
@@ -72,4 +72,4 @@ Full JSON reports include the bounded folder inventory and recovery evidence. Fo
 
 The application loads bundled local content. Its content-security policy rejects external scripts, frames and objects. The only enabled plugin capability is the directory picker plus Tauri's core window/event facilities. Custom native commands expose scanning, cancellation, current-report folder reveal, user-dialog-mediated report export and opening a fixed allowlist of official documentation URLs in the system browser. VS Code additionally provides clipboard copying and local preferences. There is no generic execution endpoint, cleanup endpoint or package-manager subprocess. VS Code filesystem actions require a trusted local workspace.
 
-The pilot has not undergone a formal security audit. Signed release binaries, large-scale performance measurements, stronger hostile-filesystem hardening and additional native UI tests are release-hardening work, not claims of this version.
+No formal security audit is claimed. VS Code 1.0.0 supports the local desktop environments listed in the extension README. Windows desktop remains an unsigned preview; other desktop targets are not part of GA. Representative user-machine performance, stronger hostile-filesystem hardening and broader configuration support remain future work.

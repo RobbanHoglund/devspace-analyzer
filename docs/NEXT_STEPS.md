@@ -1,6 +1,6 @@
-# Pilot review and next steps
+# Acceptance and next steps
 
-## First native validation
+## User-machine acceptance
 
 Use a small known workspace before scanning a whole user profile. Keep ordinary developer tools closed for the comparison.
 
@@ -22,7 +22,7 @@ The most important review areas are scope coverage, false confidence in cleanup 
 
 ## Next-stage features
 
-1. Maintain the verified dependency lockfiles and add signed, reproducible release packaging.
+1. Maintain verified dependency lockfiles and the versioned VSIX release workflow. Desktop signing remains future work; desktop is outside the VS Code 1.0.0 GA scope.
 2. Add per-cache discovery diagnostics and more configuration resolution without executing project code.
 3. Add a strictly opt-in, bounded Git-status adapter before making tracked-file or uncommitted-change claims. Keep worktrees and branch scope explicit.
 4. Add better dependency-origin checks for local/file/editable packages, lockfile validation and recovery evidence. No absence-of-reference proof based only on the scanned projects.

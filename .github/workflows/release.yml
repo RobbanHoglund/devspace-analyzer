@@ -1,0 +1,41 @@
+name: Prepare VSIX release draft
+on:
+  workflow_run:
+    workflows: [VS Code extension, Core and desktop checks]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: devspace-release-draft
+  cancel-in-progress: false
+jobs:
+  draft:
+    if: >-
+      github.repository == 'RobbanHoglund/devspace-analyzer' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+       (github.event.workflow_run.event == 'push' &&
+        github.event.workflow_run.head_branch == 'main' &&
+        github.event.workflow_run.head_repository.full_name == github.repository &&
+        github.event.workflow_run.conclusion == 'success'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      # Only trusted main source runs with write permission. No PR artifacts,
+      # dependency installation, artifact execution or cache restoration here.
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify both main workflows and prepare an unpublished release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: python scripts/release.py

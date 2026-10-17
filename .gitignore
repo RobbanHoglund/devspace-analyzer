@@ -17,3 +17,4 @@ vscode/THIRD_PARTY_NOTICES.txt
 
 src-tauri/THIRD_PARTY_NOTICES.txt
 .scanner-baseline/
+__pycache__/

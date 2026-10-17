@@ -1,34 +1,23 @@
-# Final merge and GA readiness review — 0.4.2
+# Final merge and GA readiness review — 1.0.0
 
-Reviewed 2026-10-17. This is a preview and a release-readiness assessment, not a
-publication or merge. The feature branch remains stacked on the earlier storage
-and insights work. Release the reviewed combined source, not an older main build.
+Prepared 2026-10-17. This branch prepares the VS Code extension for GA; merge and
+publication are separate maintainer actions. The Windows desktop remains preview.
 
-## Verdict and final corrections
+## Final corrections and merge gate
 
-**Merge candidate after the final 0.4.2 CI is green; not yet a GA package.**
-The final review started from `2e626ac1e60530305d0b9565c32439a80d8f1479`
-(0.4.1). Both workflows were green, and its Windows VSIX was inspected directly.
-The PR merge tree matched the feature-head source tree. Review threads were empty.
+The 0.4.2 baseline (`29a93f29ee2f93d66c35e9e4aae887c5e8defe2e`) passed both CI
+workflows on all four extension platforms and Windows desktop. Its final review
+fixed mixed-case Pipenv marker discovery, preserved actual filesystem case/link
+checks on every platform, and changed the dialog to **Manual cleanup guide**,
+**Choose instructions** and **Cleanup commands never run from this window**.
+The Mac filesystem fixtures now use canonical temporary paths, preserving the
+scanner's rejection of linked scan roots.
 
-The review found and fixed a scanner regression introduced in 0.4.1: Windows
-directory hints were lowercased, but the `Pipfile` and `Pipfile.lock` lookup keys
-were not. Small-directory scans could therefore miss Pipenv projects or their
-lockfile evidence. A focused test failed before the fix. Hints and lookup keys
-now both fold ASCII case on every platform, while the existing filesystem probe
-still decides whether the marker actually exists and rejects links. This also
-preserves discovery on case-insensitive macOS volumes without treating differently
-cased files as markers on case-sensitive volumes. Filesystem regression fixtures
-cover mixed-case Pipenv markers and the volume's actual case behavior; Mac CI now
-runs these fixtures too.
-
-The cleanup dialog now says **Manual cleanup guide**, **Choose instructions**
-and **Cleanup commands never run from this window**. Choosing an option only
-changes the displayed command. Copying and scanning remain separate actions.
-
-The PR description records the final commit, workflow runs and package checksum.
-Use those final results for merge; the earlier green 0.4.1 build does not validate
-the later correction. The release decisions below remain deliberately unchanged.
+The 1.0.0 preparation adds the chosen license, stable extension metadata, durable
+release automation and one combined PR against main. Merge only when both workflows
+are green on the **final 1.0.0 revision**. The PR description records those exact
+runs and the inspected Windows VSIX checksum; earlier green runs do not validate
+later changes. After merge, main CI independently gates the draft release.
 
 ## Product and functional review
 
@@ -40,7 +29,7 @@ the later correction. The release decisions below remain deliberately unchanged.
 | Navigation | Back/Forward, breadcrumbs, folder drill-down and restoration covered. Fixed a reproduced narrow-view click loss: changing the hover caption height moved the folder row under the pointer. Caption space is now stable. |
 | Accessibility/layout | Dialog traps focus, Escape returns to the opener, header/footer remain visible while instructions scroll. Existing keyboard, narrow editor, high-contrast and long-path cases retained. |
 | Branding | Original JvmScope publisher portrait reused byte-for-byte. Product mark uses the same blue rounded-tile vocabulary; Activity Bar/editor marks follow its monochrome magnifier convention. Image assets are bundled locally. |
-| Packaging | Version 0.4.2 is consistent. Icon is declared and included. Both VSIX and desktop build package dependency license notices. Old compiled modules are cleared before build, and package inspection refuses a stale cleanup runner. |
+| Packaging | Version 1.0.0 is consistent. The extension Preview flag is removed; desktop remains preview. Icon, Apache LICENSE/NOTICE and dependency notices are included and checked during packaging. Old compiled modules are cleared before build, and package inspection refuses a stale cleanup runner. |
 | Host boundaries | Removed execution endpoints rejected even if sent directly. Scanner rejects --cleanup. Official documentation opens through an allowlist. Folder reveal now checks ancestors consistently for both storage folders and findings. |
 | Data protection | No scan writes/deletion/tool execution. Existing tests cover protected aggregates, linked ancestors/junctions, scope union, cancellation, partial reports and redacted export. Comparisons preserve the last complete baseline. |
 | Dependencies | Fresh root and extension npm audits report zero advisories. Rust dependency resolution is unchanged since the earlier audit, and the current RustSec database HEAD was checked to still be the audited revision below. This is not a newly executed Rust audit. Two existing informational advisories are described below. |
@@ -68,7 +57,7 @@ Paired scanner benchmarks (`node scripts/compare-scanner.mjs CURRENT BASELINE`)
 compare complete reports against 0.4.0 on identical flat/deep 100,100-file fixtures,
 with warmup and three alternating measured rounds. Verified Windows 0.4.1 medians
 were 3,780 → 604 ms for the flat tree and 17,076 → 1,183 ms for the deep tree.
-Final 0.4.2 CI repeats both comparisons. These are warm synthetic measurements,
+Final 0.4.2 Windows medians were 3,195 → 538 ms (flat) and 14,316 → 1,031 ms (deep). The 1.0.0 CI repeats both comparisons. These are warm synthetic measurements,
 not a prediction for a user's SSD. See [PERFORMANCE.md](PERFORMANCE.md).
 
 The complete-rescan Overview fixture at 1440 × 900 shrank from 2,113 to 1,182 px
@@ -84,21 +73,24 @@ not in the standalone scanner bundled in the VSIX. The GTK-based Linux desktop
 is not a supported packaged target in this release; do not promote it to GA
 without reviewing/updating that dependency chain.
 
-## Decisions before GA
+## Release decisions implemented for 1.0.0
 
-| Item | Status / required action |
+| Item | Decision / evidence |
 | --- | --- |
-| License and permitted use | **Open.** The package license is UNLICENSED and explicitly evaluation-only. Choose the terms for general use. No license was changed implicitly by the branding request. JvmScope uses Apache-2.0; that is a separate decision for this repository. |
-| Mainline/release source | **Open.** PR #8 targets main; #9 targets #8's branch; #10 targets #9's branch. Merge #8 → #9 → #10, checking/retargeting each remaining base to main after its dependency is merged. Verify final combined main CI before building/publishing the GA package. This work does not merge or publish. |
-| Public distribution | **Open.** No GitHub release existed when checked on 2026-10-17. Actions artifacts expire after 14 days. Publish a versioned, durable GitHub release and/or Marketplace listing. Verify publisher ownership if using Marketplace. |
-| Version/status | **Open.** Promote to the chosen GA version (normally 1.0.0 for the first stable release) and remove Preview only after the chosen release scope passes its gates. |
-| Desktop signing | **Open for the desktop distribution.** The Windows installer/executable are unsigned. Decide the signing/distribution policy before promising a friction-free public Windows install. This does not stop testing the VSIX. |
-| User-machine acceptance | **Still needed.** Exercise the final Windows VSIX on a representative real workspace and confirm folder picking, Explorer reveal, exports, restart/preferences and manual guidance. Automated fixtures do not certify every package-manager setup, filesystem or antivirus policy. |
+| License | Apache-2.0, matching JVMScope; full text at the repository root and inside the VSIX. NOTICE attributes Robert Höglund. Third-party notices retained. |
+| Scope and status | VS Code extension 1.0.0, Preview false. Supported local desktop platforms are Windows x64, Linux x64 (glibc), macOS Intel and Apple silicon. |
+| Mainline | PR #10 includes all earlier #8/#9 work and targets main directly. No stacked merge sequence is needed. |
+| Distribution | GitHub Releases with four platform VSIX files, SHA256SUMS and SOURCE.json. Automation requires both successful main CI workflows for the exact revision and verifies artifact digests, source and metadata before preparing an unpublished draft. |
+| Publication | Explicit maintainer action after merge, main CI and final acceptance. No release or Marketplace listing is published by this branch. |
+| Desktop | Remains an unsigned preview, labelled in the application and documentation, excluded from the GA release assets. Desktop signing is outside this release. |
+| User-machine acceptance | The final package can be installed before merge. Check folder picking, reveal, exports, restart/preferences and manual guidance on a representative local workspace. Only the user can confirm behavior on that machine; automated fixtures are not a claim of that acceptance. |
+
+Release regression tests cover trusted event/source checks, latest CI attempt
+selection, artifact completeness and integrity, VSIX metadata, source revision,
+draft-only creation, checksums, idempotent retries and refusal to overwrite assets.
+The actual release draft is first created after merge; a mocked test cannot prove
+repository write permissions or claim a completed publication. See [RELEASING.md](RELEASING.md).
 
 No formal security audit or complete support for remote VS Code, vscode.dev,
 network/hostile filesystems, physical allocation or every package-manager override
-is claimed. These supported-scope limits belong in the public product description.
-
-For a VSIX-only GA, desktop signing and unsupported Linux desktop dependencies
-are outside that release's scope. Do not make them blockers for the extension,
-and do not describe the separate desktop preview as GA implicitly.
+is claimed. These supported-scope limits are stated in the public product description.

@@ -17,6 +17,11 @@ try {
     if (-not (Test-Path -LiteralPath $executable) -or -not (Test-Path -LiteralPath $uninstaller)) { throw 'Installed application or uninstaller is missing.' }
     $notices = @(Get-ChildItem -LiteralPath $installRoot -Recurse -Filter THIRD_PARTY_NOTICES.txt)
     if ($notices.Count -lt 1) { throw 'Installed third-party license notices are missing.' }
+    foreach ($name in @('LICENSE', 'NOTICE')) {
+        $installedNotice = Join-Path $installRoot $name
+        if (-not (Test-Path -LiteralPath $installedNotice)) { throw "Installed $name is missing." }
+        if ((Get-FileHash -LiteralPath $installedNotice).Hash -ne (Get-FileHash -LiteralPath $name).Hash) { throw "Installed $name differs from source." }
+    }
     $installed = $true
     # Launch in a separate PowerShell process: the native-test script uses exit.
     & pwsh -NoProfile -File scripts/windows-native-test.ps1 -Executable $executable
