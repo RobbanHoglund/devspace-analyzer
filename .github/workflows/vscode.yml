@@ -37,6 +37,9 @@ jobs:
       - run: npm ci --prefix vscode --no-audit --no-fund
       - name: Build platform VSIX with bundled scanner
         run: npm run package --prefix vscode
+      - name: Verify marker discovery on the Mac filesystem
+        if: runner.os == 'macOS'
+        run: cargo test --locked -p devspace-core --test scan_listing
       - name: Synthetic 100,100-file scanner benchmark
         if: runner.os != 'macOS'
         run: node scripts/benchmark-scanner.mjs > artifacts/scanner-benchmark-${{ matrix.target }}.json

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.4.2
+
+- Fix case-normalized marker lookups so Windows recognizes Pipfile and Pipfile.lock after the scanning optimization.
+- Keep directory-name hints conservative on both case-sensitive and case-insensitive volumes, including macOS, and verify marker discovery on all supported platforms.
+- Clarify that the manual cleanup guide only shows and copies instructions; choosing an option never runs a cleanup command.
+- Refresh the final merge/GA review and distinguish code readiness from the remaining license, Preview and distribution decisions.
+
 ## 0.4.1
 
 - Make Overview compact by default: use the editor width, show summary and scan comparison side by side, condense distribution rows and expand recommendation reasons on demand.

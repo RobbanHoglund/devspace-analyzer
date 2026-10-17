@@ -34,17 +34,42 @@ fn wide_listings_keep_project_markers_nested_git_and_exact_accounting() {
     assert_eq!(fs::metadata(root.join("package.json")).unwrap().modified().unwrap(), before);
 }
 
-#[cfg(windows)]
 #[test]
-fn case_insensitive_windows_markers_remain_discoverable() {
+fn marker_hints_preserve_the_filesystems_case_sensitivity() {
     let temp = tempfile::tempdir().unwrap();
     let root = temp.path().join("workspace");
     put(&root.join("PACKAGE.JSON"), b"{}"); put(&root.join("node_modules/example/index.js"), b"fixture");
     let report = scan_with_environment(
         ScanRequest { roots: vec![root.to_string_lossy().into()], include_global_caches: false, protected_paths: vec![] },
-        &Environment { home: temp.path().to_path_buf(), platform: "windows".into(), vars: HashMap::new() },
+        &Environment { home: temp.path().to_path_buf(), platform: std::env::consts::OS.into(), vars: HashMap::new() },
         &AtomicBool::new(false), |_| {},
     ).unwrap();
-    assert!(report.complete); assert_eq!(report.projects.len(), 1);
-    assert_eq!(report.findings[0].kind, "node-modules"); assert_eq!(report.progress.files, 2);
+    assert!(report.complete); assert_eq!(report.progress.files, 2);
+    // Match the filesystem's own answer, including case-sensitive volumes on
+    // platforms where the default is otherwise case-insensitive.
+    if root.join("package.json").is_file() {
+        assert_eq!(report.projects.len(), 1);
+        assert_eq!(report.findings[0].kind, "node-modules");
+    } else {
+        assert!(report.projects.is_empty()); assert!(report.findings.is_empty());
+    }
+}
+
+#[test]
+fn pipenv_projects_retain_mixed_case_manifest_and_lockfile_markers() {
+    let temp = tempfile::tempdir().unwrap();
+    let root = temp.path().join("workspace");
+    put(&root.join("pipenv/Pipfile"), b"[packages]\n");
+    put(&root.join("pipenv/Pipfile.lock"), b"{}");
+    let report = scan_with_environment(
+        ScanRequest { roots: vec![root.to_string_lossy().into()], include_global_caches: false, protected_paths: vec![] },
+        &Environment { home: temp.path().to_path_buf(), platform: std::env::consts::OS.into(), vars: HashMap::new() },
+        &AtomicBool::new(false), |_| {},
+    ).unwrap();
+    assert!(report.complete); assert_eq!(report.progress.files, 2);
+    assert_eq!(report.projects.len(), 1);
+    assert_eq!(report.projects[0].ecosystems, ["Python"]);
+    assert_eq!(report.projects[0].markers, ["Pipfile"]);
+    assert_eq!(report.projects[0].lockfiles, ["Pipfile.lock"]);
+    assert_eq!(report.projects[0].owned_logical_bytes, report.progress.logical_bytes);
 }

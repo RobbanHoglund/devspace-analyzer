@@ -65,4 +65,4 @@ Open **Overview → How to clean up**, or choose an npm, pnpm or pip cache in **
 
 Review the target and consequences, choose **Copy command**, and use your own terminal. **Scan again** reuses the report’s original scope. A complete scan is needed for before/after comparison. Protected and partly measured caches do not offer cleanup commands. Demo paths are examples and cannot be copied from cache guidance.
 
-Version 0.4.1 remains a preview pending the release decisions recorded in `docs/GA_REVIEW.md` in the source repository.
+Version 0.4.2 remains a preview pending the release decisions recorded in `docs/GA_REVIEW.md` in the source repository.

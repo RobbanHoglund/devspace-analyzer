@@ -2,7 +2,7 @@
   "name": "devspace-analyzer",
   "displayName": "DevSpace Analyzer",
   "description": "Read-only developer storage analysis with interactive maps and practical cleanup guidance.",
-  "version": "0.4.1",
+  "version": "0.4.2",
   "publisher": "RobbanHoglund",
   "license": "UNLICENSED",
   "repository": {

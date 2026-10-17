@@ -12,7 +12,7 @@ pub(super) struct Entries {
 }
 
 pub(super) fn may_contain(names: Option<&BTreeSet<OsString>>, name: &str) -> bool {
-    names.is_none_or(|names| names.contains(&OsString::from(name)))
+    names.is_none_or(|names| names.contains(&OsString::from(name).to_ascii_lowercase()))
 }
 
 impl Entries {
@@ -27,9 +27,11 @@ impl Entries {
                 return Ok(Self { buffered, remaining: None, names: complete.then_some(names) });
             };
             if let Ok(entry) = &entry {
-                let name = entry.file_name();
-                #[cfg(windows)]
-                let name = name.to_ascii_lowercase();
+                // Hints must work on both case-sensitive and case-insensitive
+                // volumes (including macOS). A possible match still goes through
+                // the original filesystem/no-follow probe; folding only avoids
+                // false negatives, it does not establish a marker by itself.
+                let name = entry.file_name().to_ascii_lowercase();
                 names.insert(name);
             } else { complete = false; }
             buffered.push_back(entry);
@@ -42,5 +44,20 @@ impl Iterator for Entries {
     type Item = io::Result<fs::DirEntry>;
     fn next(&mut self) -> Option<Self::Item> {
         self.buffered.pop_front().or_else(|| self.remaining.as_mut().and_then(Iterator::next))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mixed_case_markers_are_not_rejected_by_normalized_name_hints() {
+        // Windows directory listings already normalize these names. The lookup
+        // must normalize the mixed-case spellings in MARKERS and LOCKS too.
+        let names = BTreeSet::from([OsString::from("pipfile"), OsString::from("pipfile.lock")]);
+        assert!(may_contain(Some(&names), "Pipfile"));
+        assert!(may_contain(Some(&names), "Pipfile.lock"));
+        assert!(!may_contain(Some(&names), "package.json"));
     }
 }

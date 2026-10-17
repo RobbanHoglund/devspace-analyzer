@@ -30,7 +30,7 @@ async function setup(page: Page, options: { protected?: boolean; partial?: boole
 test('guidance copies the exact scoped command without execution, then explicitly compares a rescan', async ({page}) => {
   await setup(page);
   await page.getByRole('button',{name:'How to clean up →'}).click();
-  const dialog = page.getByRole('dialog',{name:'How to clean up'});
+  const dialog = page.getByRole('dialog',{name:'Manual cleanup guide'});
   await expect(dialog.getByRole('region',{name:'Measured cache'})).toContainText('1 KiB');
   await dialog.getByRole('radio',{name:'Clear npm package cache',exact:true}).check();
   await dialog.getByRole('button',{name:'Copy command',exact:true}).click();

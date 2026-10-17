@@ -105,7 +105,7 @@ export async function run(): Promise<void> {
     await vscode.commands.executeCommand('devspace.scanFolder', vscode.Uri.file(npmCache));
     const maintenance = view.getByRole('region', { name: 'Cache cleanup guidance' }); await maintenance.waitFor();
     await maintenance.getByRole('button', { name: 'How to clean up →' }).click();
-    const guide = view.getByRole('dialog', { name: 'How to clean up' });
+    const guide = view.getByRole('dialog', { name: 'Manual cleanup guide' });
     await guide.getByRole('radio', { name: 'Clear npm package cache', exact: true }).check();
     await guide.getByRole('button', { name: 'Copy command', exact: true }).click();
     const copied = await vscode.env.clipboard.readText();
