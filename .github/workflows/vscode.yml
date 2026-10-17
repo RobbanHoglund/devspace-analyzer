@@ -37,6 +37,24 @@ jobs:
       - run: npm ci --prefix vscode --no-audit --no-fund
       - name: Build platform VSIX with bundled scanner
         run: npm run package --prefix vscode
+      - name: Verify marker discovery on the Mac filesystem
+        if: runner.os == 'macOS'
+        run: cargo test --locked -p devspace-core --test scan_listing
+      - name: Synthetic 100,100-file scanner benchmark
+        if: runner.os != 'macOS'
+        run: node scripts/benchmark-scanner.mjs > artifacts/scanner-benchmark-${{ matrix.target }}.json
+      - name: Check out 0.4.0 scanner for paired performance comparison
+        if: runner.os != 'macOS'
+        uses: actions/checkout@v4
+        with:
+          ref: eec50f9df34a6c9ed7621e9670edff50371cc092
+          path: .scanner-baseline
+      - name: Build baseline scanner with the same toolchain
+        if: runner.os != 'macOS'
+        run: cargo build --locked --manifest-path .scanner-baseline/Cargo.toml --release -p devspace-core --bin devspace-scan
+      - name: Compare flat and deep scans against 0.4.0 with identical reports
+        if: runner.os != 'macOS'
+        run: node scripts/compare-scanner.mjs vscode/bin/devspace-scan${{ runner.os == 'Windows' && '.exe' || '' }} .scanner-baseline/target/release/devspace-scan${{ runner.os == 'Windows' && '.exe' || '' }} > artifacts/scanner-comparison-${{ matrix.target }}.json
       - name: Protocol, cancellation, read-only scan and export regression tests
         run: npm test --prefix vscode
       - name: Install VSIX and exercise real VS Code
@@ -48,6 +66,11 @@ jobs:
       - name: Restricted Mode refuses scans and permits demo
         if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration --prefix vscode -- --restricted
+      - name: Verify the declared minimum VS Code version
+        if: runner.os == 'Linux'
+        env:
+          DEVSPACE_VSCODE_VERSION: '1.85.0'
+        run: xvfb-run -a npm run test:integration --prefix vscode
       - name: Verify locked dependencies
         run: git diff --exit-code -- package-lock.json Cargo.lock vscode/package-lock.json
       - name: Retain test evidence
@@ -56,8 +79,8 @@ jobs:
         with:
           name: vscode-checks-${{ matrix.target }}
           path: |
-            artifacts/*.png
-            artifacts/*.json
+            artifacts/**/*.png
+            artifacts/**/*.json
           retention-days: 14
       - name: Retain verified installable extension
         uses: actions/upload-artifact@v4

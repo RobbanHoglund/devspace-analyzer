@@ -22,6 +22,7 @@ test('a failed rescan retains the report, selection and export until a successfu
   await expect(page.getByText('The new scan failed.', { exact: false })).toBeVisible();
   await expect(page.locator('tbody tr')).toHaveCount(10);
   await expect(page.getByRole('complementary', { name: 'Finding details' })).toContainText('Installed Node dependencies');
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
   const exported = await page.evaluate(() => JSON.parse(localStorage.getItem('test-export')!));
   expect(exported.report.findings).toHaveLength(10); expect(exported.origin).toBe('native');
@@ -44,6 +45,7 @@ test('demo provenance survives a failed attempt at native scanning', async ({ pa
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('Scan failed');
   await expect(page.getByText('DEMO · SYNTHETIC DATA', { exact: true })).toBeVisible();
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', { name: 'Export JSON', exact: true }).click();
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('test-export')!).origin)).toBe('demo');
 });
@@ -65,7 +67,7 @@ test('a cancelled rescan replaces the clearly marked previous report with partia
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
   await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
   await expect(page.getByText('Showing the previous report while a new scan runs.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Show in file manager', exact: true })).toBeDisabled();
   await page.getByRole('button', { name: 'Cancel scan', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Cancelled · partial results', exact: true })).toBeVisible();
   await expect(page.getByText('Showing the previous report while a new scan runs.')).toHaveCount(0);

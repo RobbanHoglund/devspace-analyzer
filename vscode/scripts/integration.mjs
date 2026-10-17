@@ -21,7 +21,10 @@ try {
     'window.titleBarStyle': 'custom', 'security.workspace.trust.startupPrompt': 'never', 'security.workspace.trust.enabled': restricted,
   }));
   const npmrc = path.join(temporary, 'npmrc'); await writeFile(npmrc, '');
-  const executable = await downloadAndUnzipVSCode({ cachePath: path.join(extensionRoot, '.vscode-test') });
+  const npmCache = path.join(temporary, 'npm-cache');
+  await mkdir(path.join(npmCache, '_cacache'), { recursive: true });
+  await writeFile(path.join(npmCache, '_cacache', 'fixture'), Buffer.alloc(2048, 1));
+  const executable = await downloadAndUnzipVSCode({ version: process.env.DEVSPACE_VSCODE_VERSION, cachePath: path.join(extensionRoot, '.vscode-test') });
   const pkg = JSON.parse(await readFile(path.join(extensionRoot, 'package.json'), 'utf8'));
   const vsix = path.join(root, 'artifacts', `devspace-analyzer-${pkg.version}-${process.platform}-${process.arch}.vsix`);
   const [cli, ...cliArgs] = resolveCliArgsFromVSCodeExecutablePath(executable);
@@ -30,8 +33,8 @@ try {
   if (install.status !== 0) throw new Error('VSIX installation failed.');
   const options = {
     vscodeExecutablePath: executable, extensionDevelopmentPath: path.join(extensionRoot, 'test', 'harness'),
-    extensionTestsPath: path.join(extensionRoot, 'dist', 'vscode', 'test', 'integration.js'),
-    extensionTestsEnv: { npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, DEVSPACE_TEST_ROOT: temporary, DEVSPACE_RESTRICTED: restricted ? '1' : '0', DEVSPACE_ARTIFACTS: path.join(root, 'artifacts') },
+    extensionTestsPath: path.join(extensionRoot, 'dist', 'vscode', 'test', process.env.DEVSPACE_VSCODE_VERSION ? 'minimum.js' : 'integration.js'),
+    extensionTestsEnv: { npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, npm_config_cache: npmCache, NPM_CONFIG_CACHE: npmCache, DEVSPACE_TEST_ROOT: temporary, DEVSPACE_RESTRICTED: restricted ? '1' : '0', DEVSPACE_ARTIFACTS: path.join(root, 'artifacts', process.env.DEVSPACE_VSCODE_VERSION ? 'minimum-vscode' : '.') },
     launchArgs: [fixture, '--extensions-dir', extensions, '--user-data-dir', profile, '--skip-welcome', '--skip-release-notes', '--no-sandbox', '--disable-gpu', '--remote-debugging-port=9228', ...(restricted ? [] : ['--disable-workspace-trust'])],
   };
   if (restricted) {

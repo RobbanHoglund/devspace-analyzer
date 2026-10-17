@@ -1,4 +1,6 @@
 import type { Finding, Project, Report, Risk } from './types';
+import { demoStorage } from './demoStorage';
+import { inside } from './storage';
 const gib = (n: number) => Math.round(n * 1024 ** 3);
 export function demoReport(): Report {
   const home = 'C:\\Users\\Developer';
@@ -8,7 +10,7 @@ export function demoReport(): Report {
     { id: 'p2', name: 'data-lab', path: 'C:\\Workspaces\\data-lab', ecosystems: ['Python'], markers: ['pyproject.toml'], lockfiles: ['uv.lock'], gitKind: 'worktree', branch: null, wrapperVersion: null, workspace: false, ownedLogicalBytes: gib(1.9), artifactBytes: gib(1.75) }
   ];
   const add = (id: string, label: string, ecosystem: string, path: string, size: number, risk: Risk, projectId: string | null, reason: string, recovery: string, extra: Partial<Finding> = {}): Finding => ({
-    id, label, ecosystem, path, logicalBytes: gib(size), risk, projectId, reason, recovery, kind: 'demo-category', confidence: 'contextual', files: Math.round(size * 13_742), latestModified: 1788004800,
+    id, label, ecosystem, path, logicalBytes: gib(size), risk, projectId, reason, recovery, kind: ['gradle-cache', 'node-modules', 'maven-repository', 'virtual-disks', 'gradle-wrapper', 'python-venv', 'gradle-project', 'node-output', 'python-bytecode', 'git-metadata'][Number(id.slice(1))] ?? 'demo-category', confidence: 'contextual', files: Math.round(size * 13_742), latestModified: 1788004800,
     evidence: ['Synthetic demonstration finding; not measured on this computer.'], caveats: ['Source availability, tracked files and running tools must be checked before cleanup.', 'Logical bytes are not guaranteed space savings.'], complete: true, userProtected: false, wrapperVersion: null, wrapperReferences: [], ...extra
   });
   const findings = [
@@ -23,10 +25,15 @@ export function demoReport(): Report {
     add('f8', 'Python bytecode cache', 'Python', `${projects[2].path}\\src\\__pycache__`, 0.05, 'low', 'p2', 'Each observed .pyc filename has a corresponding .py source filename. Source content was not opened.', 'Python normally recreates bytecode when the source is imported.'),
     add('f9', 'Git metadata', 'Git', `${projects[1].path}\\.git`, 0.3, 'protected', 'p1', 'Repository history and references are not build cache.', 'Use Git maintenance after a backup; do not delete this directory.')
   ];
+  projects[0].recoveryEvidence = { wrappers: ['gradlew', 'gradlew.bat'], nodeManifest: 'absent', packageManager: null, scripts: [], localDependencies: [], localDependencyCount: 0, installScripts: false, patches: false };
+  projects[1].recoveryEvidence = { wrappers: [], nodeManifest: 'parsed', packageManager: 'pnpm', scripts: ['build', 'dev'], localDependencies: ['catalog-ui'], localDependencyCount: 1, installScripts: false, patches: false };
+  const roots = ['C:\\Workspaces', home];
+  const storage = demoStorage(roots, findings, `${projects[0].path}/logs`, gib(42.1) - findings.reduce((n, f) => n + f.logicalBytes, 0));
+  for (const directory of storage.directories) if (inside(projects[1].path, directory.path)) directory.complete = false;
   return {
-    schemaVersion: 1, startedAt: 1791622800, durationMs: 12400, roots: ['C:\\Workspaces', `${home}\\.gradle`, `${home}\\.m2\\repository`],
+    storage, schemaVersion: 2, startedAt: 1791622800, durationMs: 12400, roots,
     globalCaches: [{ path: `${home}\\.gradle\\caches`, ecosystem: 'Gradle', kind: 'gradle-caches', source: 'Platform default (demo)' }, { path: `${home}\\.m2\\repository`, ecosystem: 'Maven', kind: 'maven-repository', source: 'Platform default (demo)' }],
-    findings, projects, progress: { files: 487214, directories: 36182, logicalBytes: gib(42.1), projects: projects.length, currentPath: '' },
+    findings, projects, progress: { files: storage.directories.filter(d => d.parentId === null).reduce((n, d) => n + d.files, 0), directories: storage.directories.length, logicalBytes: gib(42.1), projects: projects.length, currentPath: '' },
     warnings: [{ path: `${projects[1].path}\\packages\\linked-package`, code: 'link-skipped', message: 'Linked package was not followed (synthetic warning).' }], warningCount: 1, complete: false, cancelled: false,
     sizeBasis: 'Logical file lengths, not physical or guaranteed reclaimable bytes',
     limitations: ['DEMO: all values are synthetic and illustrative; nothing on this computer was scanned.', 'Only selected roots and discovered caches are included.', 'No builds, package-manager commands or Git commands are executed.', 'Hardlinks, sparse files and compression prevent a precise reclaimable-space estimate.', 'Modification dates are not last-use dates. No matching wrapper does not mean unused.']

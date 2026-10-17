@@ -1,19 +1,51 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "DevSpace Analyzer",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "identifier": "se.devspace.analyzer",
-  "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:1420", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://127.0.0.1:1420",
+    "beforeBuildCommand": "npm run build && node scripts/third-party-notices.mjs",
+    "frontendDist": "../dist"
+  },
   "app": {
-    "windows": [{ "label": "main", "title": "DevSpace Analyzer", "width": 1440, "height": 940, "minWidth": 1000, "minHeight": 700 }],
+    "windows": [
+      {
+        "label": "main",
+        "title": "DevSpace Analyzer",
+        "width": 1440,
+        "height": 940,
+        "minWidth": 1000,
+        "minHeight": 700
+      }
+    ],
     "security": {
       "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src ipc: http://ipc.localhost; object-src 'none'; base-uri 'none'; frame-src 'none'",
-      "capabilities": ["main"]
+      "capabilities": [
+        "main"
+      ]
     }
   },
   "bundle": {
-    "active": true, "targets": ["nsis"], "icon": ["icons/icon.png", "icons/icon.ico"],
-    "shortDescription": "Read-only disk intelligence for developers",
-    "windows": { "nsis": { "installMode": "currentUser" } }
+    "active": true,
+    "targets": [
+      "nsis"
+    ],
+    "icon": [
+      "icons/icon.png",
+      "icons/icon.ico"
+    ],
+    "shortDescription": "Read-only developer storage analysis and cleanup guidance",
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "resources": {
+      "THIRD_PARTY_NOTICES.txt": "THIRD_PARTY_NOTICES.txt",
+      "../LICENSE": "LICENSE",
+      "../NOTICE": "NOTICE"
+    }
   }
 }

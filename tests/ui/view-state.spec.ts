@@ -18,11 +18,11 @@ test('demo round trip restores pagination after a filtered native report', async
   const r=demoReport();r.findings=Array.from({length:101},(_,i)=>({...r.findings[0],id:'item-'+i,label:'Item '+i}));
   await loadReport(page,r); await navigate(page,'Findings'); await page.getByLabel('Search findings').fill('Item');
   await page.getByRole('button',{name:'Next',exact:true}).click();
-  await page.getByRole('button',{name:'Explore demo',exact:true}).click(); await page.getByRole('button',{name:'Exit demo',exact:true}).click();
+  await page.getByRole('button',{name:'Scan settings',exact:true}).click(); await page.getByRole('button',{name:'Explore demo',exact:true}).click(); await page.getByRole('button',{name:'Exit demo',exact:true}).click();
   await expect(page.locator('.pagination')).toContainText('51–100 of 101');
 });
 
 test('overview recommendations open correctly after a prior filtered findings view',async ({page})=>{
   await loadReport(page);await navigate(page,'Findings');await page.getByLabel('Ecosystem filter').selectOption('Python');await navigate(page,'Overview');
-  await page.locator('.review-item').first().click();await expect(page.locator('.detail h2')).toHaveText('Gradle dependency cache');await expect(page.getByLabel('Ecosystem filter')).toHaveValue('all');
+  await page.locator('.review-item').first().click();await expect(page.locator('.detail h2')).toHaveText('Gradle build output');await expect(page.getByLabel('Ecosystem filter')).toHaveValue('all');
 });

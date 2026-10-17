@@ -23,7 +23,7 @@ export function isProgress(value: unknown): value is Progress {
   return record(value) && ['files', 'directories', 'logicalBytes', 'projects'].every(key => count(value[key])) && typeof value.currentPath === 'string';
 }
 export function isReport(value: unknown): value is Report {
-  return record(value) && value.schemaVersion === 1 && isProgress(value.progress)
+  return record(value) && (value.schemaVersion === 1 || value.schemaVersion === 2) && isProgress(value.progress)
     && typeof value.complete === 'boolean' && typeof value.cancelled === 'boolean'
     && count(value.startedAt) && count(value.durationMs) && count(value.warningCount)
     && Array.isArray(value.roots) && value.roots.every(p => typeof p === 'string')
@@ -31,5 +31,7 @@ export function isReport(value: unknown): value is Report {
     && value.findings.every(f => record(f) && typeof f.id === 'string' && typeof f.path === 'string')
     && Array.isArray(value.projects) && value.projects.length <= 10000
     && Array.isArray(value.warnings) && value.warnings.length <= 500
+    && (value.storage === undefined || record(value.storage) && typeof value.storage.truncated === 'boolean' && Array.isArray(value.storage.directories) && value.storage.directories.length <= 10128
+      && value.storage.directories.every(d => record(d) && count(d.id) && (d.parentId === null || count(d.parentId)) && typeof d.path === 'string' && ['logicalBytes', 'classifiedBytes', 'directClassifiedBytes', 'directFileBytes', 'files', 'directFiles', 'omittedDirectories'].every(k => count(d[k])) && typeof d.complete === 'boolean' && Array.isArray(d.largestFiles) && d.largestFiles.length <= 5 && d.largestFiles.every(f => record(f) && typeof f.name === 'string' && count(f.logicalBytes))))
     && Array.isArray(value.globalCaches) && Array.isArray(value.limitations);
 }

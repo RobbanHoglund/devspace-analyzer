@@ -17,10 +17,12 @@ for (const width of [380, 760, 1440]) {
     await page.setViewportSize({ width, height: 900 });
     const report = demoReport();
     await page.addInitScript(report => {
+      let folderRequests = 0;
       (window as any).acquireVsCodeApi = () => ({ postMessage: (message: any) => {
         const { command, id, args } = message;
         let result: any = null;
-        if (command === 'choose_folders') result = ['C:/Workspaces'];
+        if (command === 'choose_folders') result = ++folderRequests === 2 ? ['C:/Workspaces', 'C:/Workspaces'] : null;
+        if (command === 'set_view') localStorage.setItem('active-native-tab', args.tab);
         if (command === 'scan') { localStorage.setItem('vscode-request', JSON.stringify(args)); result = report; }
         if (command === 'save_export') { localStorage.setItem('vscode-export', args.content); result = 'C:/Reports/new-report.json'; }
         queueMicrotask(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'response', id, result } })));
@@ -32,14 +34,41 @@ for (const width of [380, 760, 1440]) {
       for (const [key, value] of Object.entries(tokens)) document.body.style.setProperty(`--vscode-${key}`, value);
     }, themeTokens);
     await expect(page.getByRole('checkbox', { name: 'Include known shared caches' })).not.toBeChecked();
-    await page.getByRole('button', { name: 'Choose folders', exact: true }).click();
+    const manualPath = page.getByLabel('Add folder path');
+    const browse = page.getByRole('button', { name: 'Browse for folders', exact: true });
+    await manualPath.fill('D:/NotAdded');
+    await browse.click();
+    await expect(page.locator('.root-chip')).toHaveCount(0);
+    await expect(manualPath).toHaveValue('D:/NotAdded');
+    await browse.click();
+    await expect(page.locator('.root-chip')).toHaveCount(1);
+    await expect(page.locator('.root-chip')).toContainText('C:/Workspaces');
+    await expect(manualPath).toHaveValue('D:/NotAdded');
+    await manualPath.fill('');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(width + 1);
+    await page.screenshot({ path: `test-results/vscode-scope-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
     await expect(page.getByRole('region', { name: 'Scan summary' })).toBeVisible();
     const request = JSON.parse(await page.evaluate(() => localStorage.getItem('vscode-request')!));
     expect(request.request.includeGlobalCaches).toBe(false);
+    expect(request.request.roots).toEqual(['C:/Workspaces']);
+    await page.getByRole('button', { name: 'Scan settings', exact: true }).click();
+    await browse.click();
+    await expect(page.locator('.root-chip')).toHaveCount(1);
+    await expect(page.getByText('Settings changed', { exact: false })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Scan settings', exact: true }).click();
     await expect(page.getByText('Browser preview', { exact: false })).toHaveCount(0);
-    for (const name of ['Overview', 'Findings', 'Projects', 'Scan coverage']) {
-      await page.getByRole('navigation').getByRole('button', { name, exact: true }).click();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toHaveCount(0);
+    await page.screenshot({ path: `test-results/vscode-overview-${width}.png`, fullPage: true });
+    for (const [tab, name] of [['overview', 'Overview'], ['storage', 'Storage'], ['findings', 'Findings'], ['projects', 'Projects'], ['coverage', 'Scan coverage']]) {
+      await page.evaluate(tab => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab } } })), tab);
+      await expect(page.getByRole('heading', { name, exact: true }).first()).toBeVisible();
+      if (tab === 'storage') {
+        const map = page.getByRole('region', { name: 'Interactive folder map' });
+        await map.getByRole('button', { name: /^Open folder: Workspaces,/ }).click();
+        await expect(map.getByRole('button', { name: /^Open folder: shopfront,/ })).toBeVisible();
+        await page.screenshot({ path: `test-results/vscode-storage-${width}.png`, fullPage: true });
+      }
       const overflow = await page.evaluate(() => ({
         width: innerWidth, document: document.documentElement.scrollWidth,
         elements: [...document.querySelectorAll('body *')].map(e => ({ tag:e.tagName, class:e.className, x:e.getBoundingClientRect().x, right:e.getBoundingClientRect().right })).filter(e => e.right > innerWidth + 1).slice(0,20),
@@ -47,10 +76,17 @@ for (const width of [380, 760, 1440]) {
       if (overflow.document > overflow.width + 1) console.log('VS_CODE_OVERFLOW', name, JSON.stringify(overflow));
       expect(overflow.document, `Overflow in ${name}`).toBeLessThanOrEqual(overflow.width + 1);
     }
-    await page.getByRole('navigation').getByRole('button', { name: 'Findings', exact: true }).click();
+    await page.getByRole('button', { name: 'Go back', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Projects', exact: true }).first()).toBeVisible();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('active-native-tab'))).toBe('projects');
+    await page.getByRole('button', { name: 'Go forward', exact: true }).click();
+    await expect.poll(() => page.evaluate(() => localStorage.getItem('active-native-tab'))).toBe('coverage');
+    await page.evaluate(() => window.dispatchEvent(new MessageEvent('message', { data: { type: 'event', name: 'host-action', payload: { tab: 'findings' } } })));
+    await expect(page.getByLabel('Ecosystem filter')).toBeVisible();
     const label = await page.locator('.finding-button strong').first().innerText();
     await page.locator('.finding-button').first().click();
     await expect(page.getByRole('heading', { name: label, exact: true })).toBeVisible();
+    await page.screenshot({ path: `test-results/vscode-review-${width}.png`, fullPage: true });
     await page.getByRole('button', { name: 'Close finding details' }).click();
     await page.screenshot({ path: `test-results/vscode-light-${width}.png`, fullPage: true });
   });

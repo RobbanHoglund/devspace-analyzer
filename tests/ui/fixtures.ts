@@ -19,3 +19,5 @@ export async function loadReport(page: Page, report: Report = demoReport()) {
 export async function navigate(page: Page, name: string) {
   await page.getByRole('navigation').getByRole('button', {name: new RegExp(`^${name}`)}).click();
 }
+
+export { storageMapReport } from '../storage-fixture';

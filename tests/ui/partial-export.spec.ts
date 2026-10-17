@@ -14,6 +14,7 @@ test('redacted Markdown downloads retain partial measurement status', async ({ p
   await page.goto('/');
   await page.getByRole('button', { name: 'Explore demo', exact: true }).click();
   const pending = page.waitForEvent('download');
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', { name: 'Export Markdown', exact: true }).click();
   const stream = await (await pending).createReadStream();
   let content = '';

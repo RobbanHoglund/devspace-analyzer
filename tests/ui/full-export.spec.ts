@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { demoReport } from '../../src/demo';
 async function markdown(page: Page) {
   const pending = page.waitForEvent('download');
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', { name: 'Export Markdown', exact: true }).click();
   const stream = await (await pending).createReadStream(); let content = '';
   for await (const chunk of stream!) content += chunk.toString();
@@ -9,6 +10,7 @@ async function markdown(page: Page) {
 }
 test('the export choice switches between a private summary and full analysis', async ({ page }) => {
   await page.goto('/'); await page.getByRole('button', { name: 'Explore demo', exact: true }).click();
+  await page.locator('.export-options summary').click();
   await expect(page.getByLabel('Redacted summary', {exact:true})).toBeChecked();
   await expect(page.locator('.export-mode-help')).toContainText('withheld');
   const summary = await markdown(page);

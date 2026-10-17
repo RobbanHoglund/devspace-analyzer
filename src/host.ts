@@ -3,9 +3,10 @@ import { listen as tauriListen } from '@tauri-apps/api/event';
 import { open } from '@tauri-apps/plugin-dialog';
 import type { Report } from './types';
 import type { ScanScope } from './scanScope';
+import { readSnapshot, type ScanSnapshot } from './scanComparison';
 
-export type HostAction = { tab?: 'overview' | 'findings' | 'projects' | 'coverage'; scanRoots?: string[]; cancel?: boolean; availability?: string };
-type Bootstrap = { roots?: string[]; protectedPaths?: string[]; includeCaches?: boolean; report?: Report; reportScope?: ScanScope; unavailable?: string };
+export type HostAction = { tab?: 'overview' | 'storage' | 'findings' | 'projects' | 'coverage'; scanRoots?: string[]; cancel?: boolean; availability?: string };
+type Bootstrap = { baseline?: ScanSnapshot; comparisonBaseline?: ScanSnapshot; roots?: string[]; protectedPaths?: string[]; includeCaches?: boolean; report?: Report; reportScope?: ScanScope; unavailable?: string };
 type VSCodeAPI = { postMessage(message: unknown): void };
 declare global { interface Window { acquireVsCodeApi?: () => VSCodeAPI } }
 
@@ -58,5 +59,18 @@ export function readPreference(key: string): string[] {
 }
 export async function savePreferences(roots: string[], protectedPaths: string[], includeCaches: boolean): Promise<void> {
   if (api) await invoke('save_preferences', { roots, protectedPaths, includeCaches });
-  else { localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths)); }
+  else {
+    localStorage.setItem('devspace.roots', JSON.stringify(roots)); localStorage.setItem('devspace.protected', JSON.stringify(protectedPaths));
+  }
+}
+
+export function readBaseline(): ScanSnapshot | null {
+  try {
+    if (inVSCode) return readSnapshot(bootstrap.baseline);
+    const raw = localStorage.getItem('devspace.baseline');
+    return raw && raw.length <= 1_500_000 ? readSnapshot(JSON.parse(raw)) : null;
+  } catch { return null; }
+}
+export function saveBaseline(snapshot: ScanSnapshot): void {
+  if (!inVSCode) localStorage.setItem('devspace.baseline', JSON.stringify(snapshot));
 }

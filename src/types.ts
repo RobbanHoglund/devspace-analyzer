@@ -12,6 +12,12 @@ export interface Project {
   gitKind: string | null; branch: string | null; wrapperVersion: string | null; workspace: boolean;
   ownedLogicalBytes: number; artifactBytes: number;
   contextOnly?: boolean;
+  recoveryEvidence?: { wrappers: string[]; nodeManifest: string; packageManager: string | null; scripts: string[]; localDependencies: string[]; localDependencyCount: number; installScripts: boolean; patches: boolean } | null;
+}
+export interface StorageFile { name: string; logicalBytes: number }
+export interface StorageDirectory {
+  id: number; parentId: number | null; path: string; logicalBytes: number; files: number;
+  classifiedBytes: number; directClassifiedBytes: number; directFileBytes: number; directFiles: number; largestFiles: StorageFile[]; complete: boolean; omittedDirectories: number;
 }
 export interface Report {
   schemaVersion: number; startedAt: number; durationMs: number; roots: string[];
@@ -19,4 +25,5 @@ export interface Report {
   findings: Finding[]; projects: Project[]; progress: Progress;
   warnings: { path: string; code: string; message: string }[]; warningCount: number;
   complete: boolean; cancelled: boolean; sizeBasis: string; limitations: string[];
+  storage?: { directories: StorageDirectory[]; truncated: boolean };
 }

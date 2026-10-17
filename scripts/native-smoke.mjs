@@ -18,6 +18,7 @@ function put(relative, content) {
   writeFileSync(path, content);
 }
 put('service/build.gradle.kts', '// Static project marker\n');
+put('service/gradlew.bat', '@echo NEVER EXECUTE THIS TEST FIXTURE\n');
 put('service/.git/HEAD', 'ref: refs/heads/main\n');
 put('service/build/classes/output.bin', Buffer.alloc(2048, 1));
 put('web/package.json', '{"name":"native-fixture-web"}');
@@ -42,10 +43,14 @@ function snapshot(root) {
   walk(root); return result;
 }
 const before = snapshot(workspace);
+const npmCache = join(temp, 'npm-cache');
+mkdirSync(join(npmCache, '_cacache'), { recursive: true });
+writeFileSync(join(npmCache, '_cacache', 'fixture'), Buffer.alloc(2048, 1));
+const npmrc = join(temp, 'npmrc'); writeFileSync(npmrc, '');
 const endpoint = 'http://127.0.0.1:9337';
 // CI child process only. The distributed application enables no debug endpoint.
 const child = spawn(executable, [], {
-  env: { ...process.env, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
+  env: { ...process.env, npm_config_cache: npmCache, NPM_CONFIG_CACHE: npmCache, npm_config_userconfig: npmrc, NPM_CONFIG_USERCONFIG: npmrc, WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS: '--remote-debugging-port=9337', WEBVIEW2_USER_DATA_FOLDER: join(temp, 'webview-profile') },
   stdio: ['ignore', 'pipe', 'pipe']
 });
 let processOutput = ''; let browser; let page; let processError; let lastProbe = '';
@@ -90,10 +95,10 @@ try {
   await page.getByRole('button', { name: 'Clear filters', exact: true }).first().click();
   await expect(page.locator('tbody tr')).toHaveCount(6);
   await page.getByRole('button', { name: /Installed Node dependencies/ }).click();
-  await expect(page.getByRole('button', { name: 'Open folder', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Show in file manager', exact: true })).toBeEnabled();
   await expect(page.getByRole('complementary', { name: 'Finding details' })).toContainText('1 KiB');
-  await page.getByRole('button', { name: 'Protect this path', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Remove personal protection', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Exclude from review', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove my exclusion', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
   await expect(page.getByRole('button', { name: /Installed Node dependencies/ })).toBeFocused();
   await page.getByRole('button', { name: /Possible Node build artifacts/ }).click();
@@ -102,10 +107,62 @@ try {
   await expect(detail).toContainText('entire aggregate is excluded from review candidates');
   await expect(detail).toContainText('Virtual disk image');
   await expect(detail).toContainText('Explicit nested Git project');
-  await expect(detail.getByRole('button', { name: 'Protect this path', exact: true })).toHaveCount(0);
+  await expect(detail.getByRole('button', { name: 'Exclude from review', exact: true })).toHaveCount(0);
   await page.evaluate(() => window.scrollTo(0, 0));
   await page.screenshot({ path: join(artifacts, 'native-findings.png'), fullPage: true });
   expect(snapshot(workspace)).toEqual(before);
+  await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
+  await page.getByRole('button', { name: 'Storage', exact: true }).click();
+  const storage = page.getByRole('region', { name: 'Storage breakdown' });
+  const nestedService = storage.getByRole('group', { name: 'Inside workspace' }).getByRole('button', { name: /^Open subfolder: service,/ });
+  await nestedService.focus(); await page.keyboard.press('Enter');
+  await expect(storage.getByRole('navigation', { name: 'Storage path' }).locator('[aria-current]')).toHaveText('service');
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await expect(nestedService).toBeFocused();
+  for (const folder of ['workspace', 'service', 'build', 'classes']) await storage.getByRole('button', { name: new RegExp(`^Open folder: ${folder},`) }).click();
+  await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Go back', exact: true }).click();
+  await expect(storage.getByRole('button', { name: /^Open folder: classes,/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Go forward', exact: true }).click();
+  await expect(storage.getByText('output.bin', { exact: true })).toBeVisible();
+  await expect(storage.locator('.storage-file')).toContainText('2 KiB');
+  await page.screenshot({ path: join(artifacts, 'native-storage.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  await page.getByRole('button', { name: 'Review build', exact: true }).click();
+  const plan = page.getByRole('region', { name: 'Project review plan' });
+  await expect(plan).toContainText('gradlew.bat found');
+  await plan.locator('summary').click();
+  await expect(plan.locator('code')).toHaveText('.\\gradlew.bat clean');
+  await page.getByRole('button', { name: 'Close finding details', exact: true }).click();
+  await page.getByRole('button', { name: 'Overview', exact: true }).click();
+  // A deliberate test-only edit verifies the difference between two real scans.
+  put('service/build/classes/output.bin', Buffer.alloc(1024, 1));
+  const changed = snapshot(workspace);
+  const comparison = page.getByRole('region', { name: 'Changes since previous scan' });
+  await comparison.getByRole('button', { name: 'Rescan the same scope' }).click();
+  await expect(comparison).toContainText('1 KiB less measured', { timeout: 30000 });
+  expect(snapshot(workspace)).toEqual(changed);
+  await page.screenshot({ path: join(artifacts, 'native-comparison.png'), fullPage: true });
+  await page.getByRole('button', { name: 'Scan settings', exact: true }).click();
+  await page.getByLabel('Add folder path').fill(npmCache);
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+  await page.getByRole('button', { name: 'Scan workspace', exact: true }).click();
+  const maintenance = page.getByRole('region', { name: 'Cache cleanup guidance' });
+  await expect(maintenance).toBeVisible();
+  await maintenance.getByRole('button', { name: 'How to clean up', exact: true }).click();
+  const guide = page.getByRole('dialog', { name: 'Manual cleanup guide' });
+  await guide.getByRole('radio', { name: 'Clear npm package cache', exact: true }).check();
+  await expect(guide.getByLabel('Cleanup command', { exact: true })).toContainText('cache clean --force');
+  await expect(guide.getByRole('button', { name: /^Run / })).toHaveCount(0);
+  expect(readFileSync(join(npmCache, '_cacache', 'fixture')).length).toBe(2048);
+  expect(await page.locator('.product-identity img').evaluate(el => el.complete && el.naturalWidth > 0)).toBe(true);
+  await page.screenshot({ path: join(artifacts, 'native-cleanup-guidance.png') });
+  // Simulate a manual change outside the application, only in our fixture.
+  rmSync(join(npmCache, '_cacache', 'fixture'));
+  await guide.getByRole('button', { name: 'Scan again', exact: true }).click();
+  await expect(comparison).toContainText('2 KiB less measured', { timeout: 30000 });
+  expect(snapshot(workspace)).toEqual(changed);
+  await page.screenshot({ path: join(artifacts, 'native-guidance-comparison.png') });
   expect(errors).toEqual([]);
   const result = {
     passed: true, revision: process.env.GITHUB_SHA ?? 'local',
@@ -116,6 +173,9 @@ try {
       'Nested project Inspect shows the enclosing protected aggregate',
       'Personal protection interaction', 'Close details and restore finding focus', 'VHDX and nested Git protect enclosing build aggregate',
       'Intrinsic protection cannot be removed by personal-protection toggle',
+      'Native storage drill-down and file sample', 'Detected wrapper yields a copy-only review command',
+      'Second real scan measures the exact test-only 1 KiB change',
+      'Copy-only npm guidance; explicit rescan measures test-only 2 KiB change; adjacent workspace unchanged',
       'Fixture content and modification times unchanged', 'No observed page errors'],
     notCovered: ['Native directory/save dialog automation', 'Folder reveal interaction', 'Large workspace cancellation', 'Installer installation/uninstallation']
   };

@@ -1,0 +1,71 @@
+.insight-action{color:var(--accent);font-size:12px;margin:7px 0 0;display:block}
+.storage-browser{padding:22px;min-width:0}
+.storage-browser>.section-heading{gap:18px;flex-wrap:wrap}
+.storage-browser .section-heading p{font-size:13px;margin:5px 0 0}
+.storage-browser label{font-size:13px;white-space:normal}
+.storage-crumbs{display:flex;gap:6px;flex-wrap:wrap;margin:20px 0}
+.storage-crumbs button{font-size:12px;max-width:100%;overflow:hidden;text-overflow:ellipsis;justify-content:flex-start}
+.storage-crumbs button[aria-current]{border-color:var(--accent);color:var(--accent)}
+.storage-total{display:flex;justify-content:space-between;gap:20px;align-items:center;flex-wrap:wrap}
+.storage-total>div{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+.storage-total strong{font-size:28px;letter-spacing:-.5px}
+.storage-total span{font-size:13px;color:var(--muted)}
+.storage-total input{max-width:100%;width:260px}
+.storage-location{display:flex;align-items:center;gap:15px;justify-content:space-between;margin:8px 0 16px;overflow-wrap:anywhere}
+.storage-location span{min-width:0}
+.storage-location button{font-size:12px;flex-shrink:0}
+.storage-note{padding:12px 14px;border-left:3px solid var(--accent);background:var(--surface-raised);font-size:13px;margin:14px 0}
+.storage-rows{margin-top:20px}
+.storage-row{display:grid;grid-template-columns:minmax(120px,1fr) minmax(110px,180px) minmax(120px,240px);gap:14px;align-items:center;padding:13px 0;border-top:1px solid var(--border);min-width:0}
+.storage-folder{display:flex;flex-direction:column;align-items:flex-start;justify-content:flex-start;background:transparent;border-color:transparent;text-align:left;white-space:normal;overflow-wrap:anywhere;padding:4px 0;min-width:0}
+.storage-folder>span{font-weight:600;font-size:14px}
+.storage-folder small{color:var(--muted);font-size:12px;font-weight:400}
+.storage-size{font-variant-numeric:tabular-nums;text-align:right;font-size:16px}
+.storage-meter{height:5px;background:var(--surface-raised);display:block;border-radius:3px;margin-top:8px;overflow:hidden}
+.storage-meter i{display:block;height:100%;background:var(--accent)}
+.storage-review{font-size:12px;white-space:normal;justify-self:end;max-width:100%}
+.storage-empty{padding:18px 0}
+.direct-files{margin-top:20px;padding-top:16px;border-top:1px solid var(--border)}
+.direct-files h3{margin:0}
+.direct-files>p{font-size:12px}
+.storage-file{display:flex;align-items:baseline;justify-content:space-between;gap:16px;margin-top:10px;font-size:13px}
+.storage-file span{min-width:0;overflow-wrap:anywhere;font-family:Consolas,monospace}
+.storage-file strong{white-space:nowrap;font-variant-numeric:tabular-nums}
+.scan-comparison{padding:18px 20px;margin:0 0 24px}
+.scan-comparison .section-heading{margin-bottom:10px;gap:16px;flex-wrap:wrap}
+.scan-comparison h2{margin-top:5px;font-size:20px}
+.scan-comparison .eyebrow{font-size:10px}
+.scan-comparison>.muted{font-size:13px;max-width:85ch}
+.scan-comparison button{font-size:12px}
+.comparison-totals{display:flex;gap:16px 40px;flex-wrap:wrap;margin:16px 0}
+.comparison-totals>span{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+.comparison-totals strong{font-size:23px;color:var(--text);font-variant-numeric:tabular-nums}
+.comparison-totals .change-down strong,.change-down{color:var(--success-text,var(--accent))}
+.comparison-totals .change-up strong,.change-up{color:var(--warning-text,var(--text))}
+.comparison-details{border-top:1px solid var(--border);padding-top:12px;margin-top:16px}
+.comparison-details summary{cursor:pointer;font-size:13px}
+.comparison-row{display:flex;align-items:center;justify-content:space-between;gap:14px;border-bottom:1px solid var(--border);padding:10px 0;min-width:0}
+.comparison-row>div{min-width:0;overflow-wrap:anywhere}
+.comparison-row button{white-space:normal;text-align:left;overflow-wrap:anywhere;max-width:100%}
+.comparison-row small{display:block;font-size:11px;color:var(--muted)}
+.comparison-row>strong{flex-shrink:0;font-variant-numeric:tabular-nums;font-size:14px}
+.unclassified-change{font-size:13px}
+.review-plan{margin-top:24px;padding-top:4px;border-top:1px solid var(--border);font-size:13px}
+.review-plan>h3{font-size:17px;line-height:1.4;color:var(--text)}
+.review-plan>p{color:var(--muted);font-size:13px;line-height:1.65}
+.review-plan .evidence-checks{list-style:none;margin:16px 0;padding:0}
+.evidence-checks li{display:flex;flex-direction:column;gap:3px;font-size:12px;padding:8px 10px;background:var(--surface-raised);border-radius:5px;overflow-wrap:anywhere}
+.evidence-checks li>span{text-transform:uppercase;letter-spacing:.5px;font-size:9px;font-weight:650;color:var(--muted)}
+.evidence-checks .check-found>span{color:var(--success-text,var(--accent))}
+.evidence-checks .check-missing>span{color:var(--warning-text,var(--text))}
+.plan-step{margin:16px 0}
+.plan-step h4{font-size:12px;color:var(--text);margin:0 0 5px}
+.plan-step p{font-size:13px;color:var(--muted);line-height:1.65;margin:0}
+.plan-command{padding:12px;border:1px solid var(--border);border-radius:6px;margin:18px 0}
+.plan-command summary{font-size:13px;cursor:pointer}
+.plan-command pre{white-space:pre-wrap;overflow-wrap:anywhere;padding:12px;background:var(--surface-input);border:1px solid var(--border);border-radius:4px;font-size:13px;user-select:all}
+.plan-command .mono{overflow-wrap:anywhere}
+.plan-command p{font-size:12px}
+.review-plan>a{font-size:12px;color:var(--accent)}
+@media(max-width:1250px){.insight-card{display:flex}.insight-card .review-item{width:100%;max-width:none;margin-top:16px}}
+@media(max-width:800px){.storage-browser{padding:16px}.storage-row{grid-template-columns:minmax(100px,1fr) minmax(90px,120px);gap:6px 12px}.storage-review{grid-column:1/-1;justify-self:start}.storage-location{align-items:flex-start;flex-direction:column;gap:8px}.storage-total strong{font-size:24px}.storage-total input{width:100%}.scan-comparison{padding:16px}.comparison-totals{gap:16px 22px}.comparison-totals strong{font-size:20px}.scan-comparison h2{font-size:18px}.storage-file{font-size:12px}}

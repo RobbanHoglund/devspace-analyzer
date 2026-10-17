@@ -4,15 +4,17 @@ import { randomBytes } from 'node:crypto';
 import { homedir } from 'node:os';
 import { lstat } from 'node:fs/promises';
 import { Scanner } from './scanner';
+import { documentationUrls } from '../../src/documentation';
 import { paths, record, scanRequest } from './protocol';
 import { exportContent, writeNewReport } from './export';
 import type { Report } from '../../src/types';
 import type { ScanScope } from '../../src/scanScope';
+import { makeSnapshot, readSnapshot, type ScanSnapshot } from '../../src/scanComparison';
 
-type Tab = 'overview' | 'findings' | 'projects' | 'coverage';
+type Tab = 'overview' | 'storage' | 'findings' | 'projects' | 'coverage';
 type Action = { tab?: Tab; scanRoots?: string[]; cancel?: boolean; availability?: string };
 type Preferences = { roots: string[]; protectedPaths: string[]; includeCaches: boolean };
-const tabs: [Tab, string, string][] = [['overview', 'Overview', 'dashboard'], ['findings', 'Findings', 'list-unordered'], ['projects', 'Projects', 'folder'], ['coverage', 'Scan coverage', 'shield']];
+const tabs: [Tab, string, string][] = [['overview', 'Overview', 'dashboard'], ['storage', 'Storage', 'database'], ['findings', 'Findings', 'list-unordered'], ['projects', 'Projects', 'folder'], ['coverage', 'Scan coverage', 'shield']];
 
 function unavailable(): string {
   if (vscode.env.remoteName) return 'This first release scans local folders in a local VS Code window. Open a local window to use DevSpace.';
@@ -22,25 +24,34 @@ function unavailable(): string {
 function requireLocal(): void { const reason = unavailable(); if (reason) throw new Error(reason); }
 function escapeAttribute(value: string): string { return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
 
+async function validateRevealPath(target: string): Promise<void> {
+  let cursor = target;
+  for (;;) {
+    if ((await lstat(cursor)).isSymbolicLink()) throw new Error('This location now contains a link. Scan again before opening it.');
+    const parent = path.dirname(cursor); if (parent === cursor) return; cursor = parent;
+  }
+}
+
 class Navigation implements vscode.TreeDataProvider<vscode.TreeItem> {
   private readonly change = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.change.event;
   description = 'Choose a folder to begin';
+  readonly views = new Map(tabs.map(([id, label, icon]) => {
+    const item = new vscode.TreeItem(label); item.id = id; item.iconPath = new vscode.ThemeIcon(icon);
+    item.command = { command: `devspace.${id}`, title: label }; return [id, item];
+  }));
   refresh(): void { this.change.fire(); }
   dispose(): void { this.change.dispose(); }
   getTreeItem(item: vscode.TreeItem): vscode.TreeItem { return item; }
+  getParent(): undefined { return undefined; }
   getChildren(): vscode.TreeItem[] {
-    const items = tabs.map(([id, label, icon]) => {
-      const item = new vscode.TreeItem(label); item.iconPath = new vscode.ThemeIcon(icon);
-      item.command = { command: `devspace.${id}`, title: label }; return item;
-    });
     const scan = new vscode.TreeItem('Scan workspace'); scan.iconPath = new vscode.ThemeIcon('search');
     scan.command = { command: 'devspace.scanWorkspace', title: 'Scan workspace' };
     const folder = new vscode.TreeItem('Choose folder to scan…'); folder.iconPath = new vscode.ThemeIcon('folder-opened');
     folder.command = { command: 'devspace.scanFolder', title: 'Choose folder to scan' };
     const status = new vscode.TreeItem(this.description); status.iconPath = new vscode.ThemeIcon('info');
     status.tooltip = 'All reported sizes are logical bytes, not guaranteed recoverable disk space.';
-    return [...items, scan, folder, status];
+    return [...this.views.values(), scan, folder, status];
   }
 }
 
@@ -50,25 +61,31 @@ export class Analyzer implements vscode.Disposable {
   private pending?: Action;
   private report?: Report;
   private reportScope?: ScanScope;
+  private baseline: ScanSnapshot | null = null;
+  private comparisonBaseline: ScanSnapshot | null = null;
   private readonly scanner: Scanner;
   private readonly navigation = new Navigation();
+  private readonly tree: vscode.TreeView<vscode.TreeItem>;
+  private activeTab: Tab = 'overview';
   private readonly disposables: vscode.Disposable[] = [];
   private preferences: Preferences;
   private preferenceWrite: Promise<void> = Promise.resolve();
 
   constructor(private readonly context: vscode.ExtensionContext) {
+    this.baseline = readSnapshot(context.workspaceState.get('baseline'));
     const roots = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath).slice(0, 32) ?? [];
     const saved = context.workspaceState.get<{ roots: string[]; includeCaches: boolean }>('scope');
     this.preferences = { roots: saved?.roots ?? roots, includeCaches: saved?.includeCaches ?? false, protectedPaths: context.globalState.get<string[]>('protectedPaths', []) };
     const binary = path.join(context.extensionPath, 'bin', process.platform === 'win32' ? 'devspace-scan.exe' : 'devspace-scan');
     this.scanner = new Scanner(binary, context.extensionPath);
-    this.disposables.push(vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation }));
+    this.tree = vscode.window.createTreeView('devspace.navigation', { treeDataProvider: this.navigation });
+    this.disposables.push(this.tree, this.tree.onDidChangeVisibility(() => this.syncView()));
     this.disposables.push(vscode.workspace.onDidGrantWorkspaceTrust(() => this.event('host-action', { availability: unavailable() })));
     this.register('devspace.open', () => this.show());
     for (const [tab] of tabs) this.register(`devspace.${tab}`, () => this.action({ tab }));
     this.register('devspace.scanWorkspace', async () => {
       requireLocal();
-      if (this.scanner.running) throw new Error('A scan is already running.');
+      if (this.scanner.running) throw new Error('Finish the current scan first.');
       const roots = vscode.workspace.workspaceFolders?.filter(f => f.uri.scheme === 'file').map(f => f.uri.fsPath) ?? [];
       if (roots.length) this.action({ scanRoots: paths(roots, 32) });
       else await this.scanFolder();
@@ -91,7 +108,7 @@ export class Analyzer implements vscode.Disposable {
   }
   private async scanFolder(uri?: vscode.Uri): Promise<void> {
     requireLocal();
-    if (this.scanner.running) throw new Error('A scan is already running.');
+    if (this.scanner.running) throw new Error('Finish the current scan first.');
     if (uri && uri.scheme !== 'file') throw new Error('Choose a local folder.');
     const selected = uri ? paths([uri.fsPath], 32) : await this.folders();
     if (selected?.length) this.action({ scanRoots: selected });
@@ -107,11 +124,12 @@ export class Analyzer implements vscode.Disposable {
     const panel = vscode.window.createWebviewPanel('devspace.analyzer', 'DevSpace Analyzer', vscode.ViewColumn.Active, {
       enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [media], enableCommandUris: false,
     });
+    panel.iconPath = { light: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'devspace-light.svg'), dark: vscode.Uri.joinPath(this.context.extensionUri, 'resources', 'devspace-dark.svg') };
     this.panel = panel; this.ready = false;
     const nonce = randomBytes(24).toString('base64');
     const script = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', 'index.js'));
     const style = panel.webview.asWebviewUri(vscode.Uri.joinPath(media, 'assets', 'index.css'));
-    const bootstrap = JSON.stringify({ ...this.preferences, report: this.report, reportScope: this.reportScope, unavailable: unavailable() }).replace(/</g, '\\u003c');
+    const bootstrap = JSON.stringify({ ...this.preferences, report: this.report, reportScope: this.reportScope, baseline: this.baseline, comparisonBaseline: this.comparisonBaseline, unavailable: unavailable() }).replace(/</g, '\\u003c');
     panel.webview.html = `<!doctype html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${panel.webview.cspSource} data:; style-src ${panel.webview.cspSource} 'unsafe-inline'; script-src 'nonce-${nonce}'; font-src ${panel.webview.cspSource}; connect-src 'none';"><title>DevSpace Analyzer</title><link rel="stylesheet" href="${escapeAttribute(style.toString())}"></head><body><div id="root"></div><script type="application/json" id="devspace-bootstrap">${bootstrap}</script><script nonce="${nonce}" type="module" src="${escapeAttribute(script.toString())}"></script></body></html>`;
     const active = new Set<number>();
     const messages = panel.webview.onDidReceiveMessage(async (message: unknown) => {
@@ -129,16 +147,25 @@ export class Analyzer implements vscode.Disposable {
     });
   }
   private event(name: string, payload: unknown): void { if (this.panel) void this.panel.webview.postMessage({ type: 'event', name, payload }); }
+  private syncView(): void {
+    const item = this.navigation.views.get(this.activeTab);
+    if (item && this.tree.visible) void this.tree.reveal(item, { select: true, focus: false }).then(undefined, () => {});
+  }
   private async request(command: string, args: Record<string, unknown>): Promise<unknown> {
     switch (command) {
       case 'ready': {
         this.ready = true; const action = this.pending; this.pending = undefined;
         if (action) this.event('host-action', action); return null;
       }
+      case 'set_view': {
+        if (!tabs.some(([tab]) => tab === args.tab)) throw new Error('Unknown DevSpace view.');
+        this.activeTab = args.tab as Tab; this.syncView(); return null;
+      }
       case 'choose_folders': return this.folders();
       case 'save_preferences': {
         if (typeof args.includeCaches !== 'boolean') throw new Error('Invalid scan preferences.');
-        this.preferences = { roots: paths(args.roots, 32), protectedPaths: paths(args.protectedPaths, 20000), includeCaches: args.includeCaches };
+        const next = { roots: paths(args.roots, 32), protectedPaths: paths(args.protectedPaths, 20000), includeCaches: args.includeCaches };
+        this.preferences = next;
         const saved = this.preferences;
         // Serialize memento writes so a slow prior update cannot restore stale choices.
         this.preferenceWrite = this.preferenceWrite.catch(() => {}).then(async () => {
@@ -149,24 +176,45 @@ export class Analyzer implements vscode.Disposable {
       }
       case 'scan': {
         requireLocal(); const request = scanRequest(args.request);
-        if (this.scanner.running) throw new Error('A scan is already running.');
+        if (this.scanner.running) throw new Error('Finish the current scan first.');
         this.navigation.description = 'Scanning…'; this.navigation.refresh();
         void vscode.commands.executeCommand('setContext', 'devspace.scanning', true);
         try {
           const result = await this.scanner.scan(request, progress => this.event('scan-progress', progress));
+          this.comparisonBaseline = this.baseline;
           this.report = result; this.reportScope = { roots: request.roots, includeCaches: request.includeGlobalCaches };
+          const snapshot = makeSnapshot(result, this.reportScope);
+          if (snapshot) {
+            this.baseline = snapshot;
+            await this.context.workspaceState.update('baseline', snapshot).then(undefined, () => vscode.window.showWarningMessage('The scan completed, but its comparison baseline could not be saved for the next session.'));
+          }
           this.navigation.description = `${result.cancelled ? 'Cancelled' : result.complete ? 'Complete' : 'Partial'} · ${result.findings.length} findings · ${result.projects.length} projects`;
           return result;
         } catch (error) { this.navigation.description = this.report ? 'Scan failed · previous report retained' : 'Scan failed'; throw error; }
         finally { void vscode.commands.executeCommand('setContext', 'devspace.scanning', false); this.navigation.refresh(); }
+      }
+      case 'open_documentation': {
+        if (typeof args.url !== 'string' || !documentationUrls.some(url => url === args.url)) throw new Error('Unsupported documentation URL.');
+        if (!await vscode.env.openExternal(vscode.Uri.parse(args.url))) throw new Error('Could not open the browser.');
+        return null;
+      }
+      case 'copy_text': {
+        if (typeof args.text !== 'string' || args.text.length > 8192) throw new Error('Invalid clipboard text.');
+        await vscode.env.clipboard.writeText(args.text); return null;
+      }
+      case 'reveal_storage': {
+        requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
+        const directory = this.report?.storage?.directories.find(d => d.id === args.id);
+        if (!directory) throw new Error('Folder is not in the current scan.');
+        await validateRevealPath(directory.path);
+        await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(directory.path)); return null;
       }
       case 'cancel_scan': this.scanner.cancel(); return null;
       case 'reveal_finding': {
         requireLocal(); if (this.scanner.running) throw new Error('Wait for the scan to finish.');
         const finding = this.report?.findings.find(f => f.id === args.id);
         if (!finding) throw new Error('Finding is not in the current scan.');
-        const stat = await lstat(finding.path);
-        if (stat.isSymbolicLink()) throw new Error('This location is now a link. Scan again before opening it.');
+        await validateRevealPath(finding.path);
         await vscode.commands.executeCommand('revealFileInOS', vscode.Uri.file(finding.path)); return null;
       }
       case 'save_export': {
@@ -180,7 +228,7 @@ export class Analyzer implements vscode.Disposable {
     }
   }
   /** Non-sensitive lifecycle status for consumers and integration checks. Reports stay in memory. */
-  getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete }; }
+  getStatus() { return { ready: this.ready, scanning: this.scanner.running, findings: this.report?.findings.length, projects: this.report?.projects.length, complete: this.report?.complete, activeTab: this.activeTab, selectedTab: this.tree.selection[0]?.id }; }
   dispose(): void { this.panel?.dispose(); this.scanner.dispose(); this.navigation.dispose(); this.disposables.forEach(item => item.dispose()); }
 }
 

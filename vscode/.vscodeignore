@@ -3,8 +3,10 @@
 !README.md
 !CHANGELOG.md
 !LICENSE
+!NOTICE
 !resources/**
 !dist/vscode/src/**
+!dist/src/**
 !media/**
 !bin/**
 !THIRD_PARTY_NOTICES.txt

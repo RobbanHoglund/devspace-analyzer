@@ -3,6 +3,10 @@ use crate::{config::{self, Environment}, model::*, paths::{display, git_marker, 
 mod rules;
 mod scope;
 mod gradle;
+mod storage;
+mod evidence;
+mod entries;
+use entries::{Entries, may_contain};
 
 const MAX_ENTRIES: u64 = 5_000_000;
 const MAX_DEPTH: usize = 128;
@@ -59,11 +63,12 @@ fn wrapper_version(root: &Path) -> Option<String> {
         version(v.trim().split(['?', '#']).next()?.rsplit('/').next()?)
     })
 }
-fn project(root: &Path, index: usize) -> Option<Project> {
-    let markers: Vec<String> = MARKERS.iter().filter(|m| regular(&root.join(m))).map(|s| s.to_string()).collect();
-    let git = if git_marker(&root.join(".git")) { fs::symlink_metadata(root.join(".git")).ok() } else { None };
+fn project(root: &Path, index: usize) -> Option<Project> { project_with_names(root, index, None) }
+fn project_with_names(root: &Path, index: usize, names: Option<&BTreeSet<std::ffi::OsString>>) -> Option<Project> {
+    let markers: Vec<String> = MARKERS.iter().filter(|m| may_contain(names, m) && regular(&root.join(m))).map(|s| s.to_string()).collect();
+    let git = if may_contain(names, ".git") && git_marker(&root.join(".git")) { fs::symlink_metadata(root.join(".git")).ok() } else { None };
     let git_kind = git.as_ref().and_then(|m| if m.is_dir() { Some("repository") } else if m.is_file() { Some("worktree") } else { None }).map(str::to_string);
-    let has_wrapper = regular(&root.join("gradle/wrapper/gradle-wrapper.properties"));
+    let has_wrapper = may_contain(names, "gradle") && regular(&root.join("gradle/wrapper/gradle-wrapper.properties"));
     if markers.is_empty() && git_kind.is_none() && !has_wrapper { return None; }
     let has = |s: &str| markers.iter().any(|m| m == s);
     let mut ecosystems = vec![];
@@ -76,8 +81,8 @@ fn project(root: &Path, index: usize) -> Option<Project> {
     let workspace = regular(&root.join("pnpm-workspace.yaml")) || small_text(&root.join("package.json")).and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok()).is_some_and(|v| v.get("workspaces").is_some());
     Some(Project {
         id: format!("p{index}"), name: root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| display(root)), path: display(root),
-        ecosystems, markers, lockfiles: LOCKS.iter().filter(|m| regular(&root.join(m))).map(|s| s.to_string()).collect(),
-        git_kind, branch, wrapper_version: wrapper_version(root), workspace, context_only: false, owned_logical_bytes: 0, artifact_bytes: 0,
+        ecosystems, markers, lockfiles: LOCKS.iter().filter(|m| may_contain(names, m) && regular(&root.join(m))).map(|s| s.to_string()).collect(),
+        git_kind, branch, wrapper_version: if has_wrapper { wrapper_version(root) } else { None }, workspace, context_only: false, owned_logical_bytes: 0, artifact_bytes: 0, recovery_evidence: Some(evidence::recovery_evidence(root)),
     })
 }
 /// Interpret only CPython's tagged cache filenames. Strip the suffix from the
@@ -122,7 +127,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
     // later roots.extend() determines whether unrelated caches are traversed.
     let discovery = config::discover_with_warnings(env);
     let report = Report {
-        schema_version: 1, started_at: now(), duration_ms: 0, roots: vec![], global_caches: discovery.locations,
+        schema_version: 2, storage: StorageInventory::default(), started_at: now(), duration_ms: 0, roots: vec![], global_caches: discovery.locations,
         findings: vec![], projects: vec![], progress: Progress::default(), warnings: vec![], warning_count: 0,
         complete: true, cancelled: false, size_basis: "Logical file lengths, not physical or guaranteed reclaimable bytes".into(),
         limitations: vec![
@@ -136,7 +141,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
             "At most 5 million entries, 20,000 findings, 10,000 projects and 128 directory levels are scanned. At most 500 warning details are retained.".into(),
         ],
     };
-    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![], gradle_modules: Default::default(), gradle_checked: Default::default() };
+    let mut s = Scanner { report, cancelled, callback: progress, start, last_emit: start, stopped: false, protected: vec![], gradle_modules: Default::default(), gradle_checked: Default::default(), storage_stack: vec![], storage_bytes: 0, classified_bytes: 0 };
     for raw in request.protected_paths {
         match normalize(Path::new(&raw)) {
             Ok(path) => s.protected.push(path),
@@ -171,6 +176,7 @@ pub fn scan_with_environment(request: ScanRequest, env: &Environment, cancelled:
 struct Scanner<'a, F: FnMut(Progress)> {
     report: Report, cancelled: &'a AtomicBool, callback: F, start: Instant,
     last_emit: Instant, stopped: bool, protected: Vec<PathBuf>,
+    storage_stack: Vec<Option<usize>>, storage_bytes: usize, classified_bytes: u64,
     gradle_modules: std::collections::BTreeMap<String, PathBuf>, gradle_checked: BTreeSet<String>,
 }
 impl<F: FnMut(Progress)> Scanner<'_, F> {
@@ -185,14 +191,23 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             (self.callback)(self.report.progress.clone()); self.last_emit = Instant::now();
         }
     }
-    fn metadata(&mut self, path: &Path, depth: usize) -> Option<fs::Metadata> {
+    fn metadata(&mut self, path: &Path, depth: usize, entry: Option<&fs::DirEntry>) -> Option<fs::Metadata> {
         if self.halted() { return None; }
         if depth > MAX_DEPTH { self.warn(path, "depth-limit", "Maximum directory depth reached."); return None; }
         if self.report.progress.files + self.report.progress.directories >= MAX_ENTRIES { self.warn(path, "entry-limit", "Maximum entry count reached. Scan narrower roots."); self.stopped = true; return None; }
-        self.report.progress.current_path = display(path); self.emit(false);
+        if self.last_emit.elapsed() > Duration::from_millis(150) {
+            self.report.progress.current_path = display(path); self.emit(false);
+        }
         // A progress callback can request cancellation too.
         if self.halted() { return None; }
-        match fs::symlink_metadata(path) {
+        // DirEntry metadata reuses Windows directory enumeration; it never follows
+        // links. Recheck directories immediately before traversal, so a buffered
+        // directory replaced by a junction is still rejected.
+        let metadata = entry.map_or_else(|| fs::symlink_metadata(path), |entry| {
+            let metadata = entry.metadata()?;
+            if metadata.is_dir() && !is_link(&metadata) { fs::symlink_metadata(path) } else { Ok(metadata) }
+        });
+        match metadata {
             Ok(m) if is_link(&m) => { self.warn(path, "link-skipped", "Symbolic link, junction or reparse point was not followed."); None }
             Ok(m) => Some(m), Err(e) => { self.warn(path, "metadata-unavailable", &e.to_string()); None }
         }
@@ -204,7 +219,9 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             self.warn(path, "policy-excluded", "Sensitive/system directory excluded by the default policy."); true
         } else { false }
     }
-    fn file_size(&mut self, meta: &fs::Metadata) -> Size {
+    fn file_size(&mut self, path: &Path, meta: &fs::Metadata, classified: bool) -> Size {
+        self.retain_file(path, meta.len(), classified);
+        if classified { self.classified_bytes = self.classified_bytes.saturating_add(meta.len()); }
         self.report.progress.files += 1;
         self.report.progress.logical_bytes = self.report.progress.logical_bytes.saturating_add(meta.len());
         Size { bytes: meta.len(), files: 1, modified: meta.modified().ok().and_then(|t| t.duration_since(UNIX_EPOCH).ok()).map(|t| t.as_secs()), ..Size::default() }
@@ -217,8 +234,7 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
     }
     /// A single traversal measures an aggregate AND checks its safety boundaries.
     /// No child findings are added, so summing findings cannot double-count bytes.
-    fn measure(&mut self, path: &Path, depth: usize, owner: Option<usize>, aggregate: &Aggregate, in_git: bool, protected_parent: bool) -> Size {
-        let Some(meta) = self.metadata(path, depth) else { return Size::missing(); };
+    fn measure(&mut self, path: &Path, depth: usize, owner: Option<usize>, aggregate: &Aggregate, in_git: bool, protected_parent: bool, meta: &fs::Metadata) -> Size {
         let mut boundary = Size::default();
         let name_is_git = path.file_name().is_some_and(|n| n.eq_ignore_ascii_case(".git"));
         if meta.is_dir() || name_is_git || path.extension().is_some_and(|e| e.eq_ignore_ascii_case("vhdx")) {
@@ -230,38 +246,49 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             }
         }
         if meta.is_file() {
-            let mut size = self.file_size(&meta);
+            let mut size = self.file_size(path, meta, true);
             self.charge(owner, size.bytes, owner == aggregate.owner && aggregate.artifact);
             size.add(boundary); return size;
         }
         if !meta.is_dir() { self.warn(path, "special-file", "Special filesystem entry was not opened."); return Size::missing(); }
         if self.excluded(path) { return Size::missing(); }
         self.report.progress.directories += 1;
+        let entries = Entries::open(path, self.cancelled);
+        let names = entries.as_ref().ok().and_then(|entries| entries.names.as_ref());
         let mut next_owner = owner;
-        if !in_git && !name_is_git && git_marker(&path.join(".git")) && !owner.is_some_and(|i| key(Path::new(&self.report.projects[i].path)) == key(path)) {
+        if !in_git && !name_is_git && may_contain(names, ".git") && git_marker(&path.join(".git")) && !owner.is_some_and(|i| key(Path::new(&self.report.projects[i].path)) == key(path)) {
             boundary.guards.insert("Explicit nested Git project inside this aggregate".into());
             if !protected_parent && boundary.protected_path_count == 0 { boundary.protect(path, "Nested Git project"); }
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return Size::missing(); }
-            if let Some(p) = self.project_at(path, self.report.projects.len()) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
+            if let Some(p) = self.project_at_with_names(path, self.report.projects.len(), names) { next_owner = Some(self.report.projects.len()); self.report.projects.push(p); }
         }
-        let entries = match fs::read_dir(path) { Ok(e) => e, Err(e) => { self.warn(path, "directory-unavailable", &e.to_string()); return Size::missing(); } };
+        let checkpoint = self.enter_directory(path);
+        let entries = match entries { Ok(entries) => entries, Err(error) => { self.warn(path, "directory-unavailable", &error.to_string()); self.leave_directory(checkpoint); return Size::missing(); } };
         let guarded = protected_parent || boundary.protected_path_count > 0;
         let mut total = boundary;
         for entry in entries {
             if self.halted() { total.incomplete = true; break; }
             match entry {
-                Ok(e) => total.add(self.measure(&e.path(), depth + 1, next_owner, aggregate, in_git || name_is_git, guarded)),
+                Ok(e) => {
+                    let child = e.path();
+                    let size = match self.metadata(&child, depth + 1, Some(&e)) {
+                        Some(meta) => self.measure(&child, depth + 1, next_owner, aggregate, in_git || name_is_git, guarded, &meta),
+                        None => Size::missing(),
+                    };
+                    total.add(size);
+                },
                 Err(e) => { self.warn(path, "entry-unavailable", &e.to_string()); total.incomplete = true; }
             }
         }
+        self.leave_directory(checkpoint);
         total
     }
-    fn visit(&mut self, path: &Path, owner: Option<usize>, depth: usize, context: Option<Rule>) {
-        let Some(meta) = self.metadata(path, depth) else { return; };
+    fn visit(&mut self, path: &Path, owner: Option<usize>, depth: usize, context: Option<Rule>, entry: Option<&fs::DirEntry>) {
+        let Some(meta) = self.metadata(path, depth, entry) else { return; };
         if let Some(mut rule) = context.or_else(|| self.rule(path, owner, meta.is_dir())) {
             if self.report.findings.len() >= MAX_FINDINGS { self.warn(path, "finding-limit", "Finding limit reached. Scan narrower roots."); self.stopped = true; return; }
             let aggregate = Aggregate { root: path.to_path_buf(), owner, artifact: rule.kind != "git-metadata" };
-            let size = self.measure(path, depth, owner, &aggregate, false, rule.risk == "protected");
+            let size = self.measure(path, depth, owner, &aggregate, false, rule.risk == "protected", &meta);
             if !size.guards.is_empty() {
                 rule.risk = "protected".into();
                 rule.reason = format!("Protected content was found inside this directory. The entire aggregate is excluded from review candidates. Original category: {}.", rule.label);
@@ -281,21 +308,25 @@ impl<F: FnMut(Progress)> Scanner<'_, F> {
             });
             return;
         }
-        if meta.is_file() { let size = self.file_size(&meta); self.charge(owner, size.bytes, false); return; }
+        if meta.is_file() { let size = self.file_size(path, &meta, false); self.charge(owner, size.bytes, false); return; }
         if !meta.is_dir() { self.warn(path, "special-file", "Special filesystem entry was not opened."); return; }
         if self.excluded(path) { return; }
         self.report.progress.directories += 1;
+        let entries = Entries::open(path, self.cancelled);
+        let names = entries.as_ref().ok().and_then(|entries| entries.names.as_ref());
         let mut next_owner = owner;
-        if let Some(p) = self.project_at(path, self.report.projects.len()) {
+        if let Some(p) = self.project_at_with_names(path, self.report.projects.len(), names) {
             if self.report.projects.len() >= MAX_PROJECTS { self.warn(path, "project-limit", "Project limit reached."); self.stopped = true; return; }
             next_owner = Some(self.report.projects.len()); self.report.projects.push(p);
         }
-        match fs::read_dir(path) {
+        let checkpoint = self.enter_directory(path);
+        match entries {
             Ok(entries) => for entry in entries {
                 if self.halted() { break; }
-                match entry { Ok(e) => self.visit(&e.path(), next_owner, depth + 1, None), Err(e) => self.warn(path, "entry-unavailable", &e.to_string()) }
+                match entry { Ok(e) => self.visit(&e.path(), next_owner, depth + 1, None, Some(&e)), Err(e) => self.warn(path, "entry-unavailable", &e.to_string()) }
             },
             Err(e) => self.warn(path, "directory-unavailable", &e.to_string()),
         }
+        self.leave_directory(checkpoint);
     }
 }

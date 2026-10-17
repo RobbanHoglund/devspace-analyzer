@@ -1,0 +1,19 @@
+/* One compact, theme-inheriting icon style for actions across all views. */
+.ui-icon{display:inline-block;width:16px;height:16px;flex:0 0 auto;vertical-align:-.2em;pointer-events:none}
+.sidebar nav .ui-icon{width:18px;height:18px}
+.badge{gap:5px}
+.badge .ui-icon{width:13px;height:13px}
+.detail-actions button{justify-content:flex-start;white-space:normal;text-align:left}
+.detail-actions button .ui-icon{color:var(--muted)}
+.detail-actions button:hover:not(:disabled) .ui-icon{color:currentColor}
+.icon-button{padding:6px;flex-shrink:0}
+.export-options>summary{display:flex;align-items:center;gap:6px;list-style:none}
+.export-options>summary::-webkit-details-marker{display:none}
+.export-options>summary .export-chevron{width:12px;height:12px;margin-left:2px}
+.export-options[open]>summary .export-chevron{transform:rotate(180deg)}
+.documentation-link .ui-icon{width:14px;height:14px;margin-left:5px}
+.pagination button{gap:4px}
+.pagination .ui-icon{width:14px;height:14px}
+.storage-crumbs button:has(>.crumb-home){display:flex;align-items:center;gap:5px}
+.storage-crumbs button:has(>.crumb-home)>span{overflow:hidden;text-overflow:ellipsis}
+.map-tile-action .ui-icon,.distribution-share .ui-icon{width:12px;height:12px;margin-left:3px}

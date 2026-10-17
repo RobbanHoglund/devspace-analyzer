@@ -1,6 +1,6 @@
-# Pilot review and next steps
+# Acceptance and next steps
 
-## First native validation
+## User-machine acceptance
 
 Use a small known workspace before scanning a whole user profile. Keep ordinary developer tools closed for the comparison.
 
@@ -22,10 +22,12 @@ The most important review areas are scope coverage, false confidence in cleanup 
 
 ## Next-stage features
 
-1. Maintain the verified dependency lockfiles and add signed, reproducible release packaging.
+1. Maintain verified dependency lockfiles and the versioned VSIX release workflow. Desktop signing remains future work; desktop is outside the VS Code 1.0.0 GA scope.
 2. Add per-cache discovery diagnostics and more configuration resolution without executing project code.
 3. Add a strictly opt-in, bounded Git-status adapter before making tracked-file or uncommitted-change claims. Keep worktrees and branch scope explicit.
 4. Add better dependency-origin checks for local/file/editable packages, lockfile validation and recovery evidence. No absence-of-reference proof based only on the scanned projects.
 5. Measure allocated size separately where the operating system supports it, and identify shared hardlinks without presenting false reclaim guarantees.
-6. Add snapshot comparison, custom output directories and performance benchmarks with representative Java/Node/Python workspaces.
-7. Treat any future cleanup capability as a separate design and security review: dry-run plans, explicit approval, path revalidation and versioned recovery notes are mandatory. Do not add broad recursive deletion to the current pilot.
+6. Extend the existing snapshot comparison and synthetic performance baseline with representative Windows Java/Node/Python workspaces and custom output directories.
+7. Maintain the copy-only cleanup guidance against official tool documentation. Runtime tool execution was removed in 0.4.0.
+
+See [GA review](GA_REVIEW.md) for the current release gates and measured validation.

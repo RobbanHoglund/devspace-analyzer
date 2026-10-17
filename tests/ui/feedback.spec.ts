@@ -2,6 +2,7 @@ import {test, expect} from '@playwright/test';
 import {loadReport, navigate} from './fixtures';
 test('export feedback remains visible at the bottom of a report and can be dismissed', async ({page}) => {
   await loadReport(page); await navigate(page, 'Findings');
+  if (!(await page.locator('.export-options').evaluate(e => e.open))) await page.locator('.export-options summary').click();
   await page.getByRole('button', {name:'Export JSON',exact:true}).click();
   const notice = page.locator('.feedback-region'); await expect(notice).toContainText('Report saved:');
   const box = await notice.boundingBox(); expect(box!.y).toBeGreaterThanOrEqual(0);
@@ -18,7 +19,7 @@ test('folder action errors remain visible and dismissible inside a modal detail 
     bridge.invoke=async (command,args)=>{if(command==='reveal_finding')throw new Error('Folder unavailable');return invoke(command,args);};
   });
   await page.getByRole('button',{name:/Installed Node dependencies/}).click();
-  await page.getByRole('button',{name:'Open folder',exact:true}).click();
+  await page.getByRole('button',{name:'Show in file manager',exact:true}).click();
   const drawer=page.getByRole('dialog',{name:'Finding details'});
   await expect(drawer.getByRole('alert')).toContainText('Folder unavailable');
   const dismiss=drawer.getByRole('button',{name:'Dismiss error'});

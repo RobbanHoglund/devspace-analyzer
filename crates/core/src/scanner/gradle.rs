@@ -90,14 +90,17 @@ fn includes(text: &str) -> (BTreeSet<PathBuf>, bool) {
 
 impl<F: FnMut(Progress)> Scanner<'_, F> {
     pub(super) fn project_at(&mut self, path: &Path, index: usize) -> Option<Project> {
-        let mut p = project(path, index).or_else(|| {
+        self.project_at_with_names(path, index, None)
+    }
+    pub(super) fn project_at_with_names(&mut self, path: &Path, index: usize, names: Option<&BTreeSet<std::ffi::OsString>>) -> Option<Project> {
+        let mut p = project_with_names(path, index, names).or_else(|| {
             let settings = self.gradle_modules.get(&key(path))?;
             Some(Project {
                 id: format!("p{index}"), name: path.file_name()?.to_string_lossy().into(), path: display(path),
                 ecosystems: vec!["Gradle".into()], markers: vec![format!("Static module declaration in {}", display(settings))],
                 lockfiles: LOCKS.iter().filter(|m| regular(&path.join(m))).map(|m| m.to_string()).collect(),
                 git_kind: None, branch: None, wrapper_version: None, workspace: false, context_only: false,
-                owned_logical_bytes: 0, artifact_bytes: 0,
+                owned_logical_bytes: 0, artifact_bytes: 0, recovery_evidence: Some(evidence::recovery_evidence(path)),
             })
         })?;
         // A declared module can have an unrelated manifest as well.

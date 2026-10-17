@@ -65,7 +65,8 @@ fn run() -> Result<(), String> {
 }
 
 fn main() {
-    if let Err(message) = run() {
+    let result = if std::env::args_os().len() == 1 { run() } else { Err("Unsupported scanner arguments.".into()) };
+    if let Err(message) = result {
         let _ = emit(json!({"type":"error", "message":message}));
         std::process::exit(1);
     }
